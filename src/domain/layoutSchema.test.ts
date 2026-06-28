@@ -26,7 +26,7 @@ describe('layout schema', () => {
       [
         {
           id: 'coffee-table',
-          position: { x: 1.1, y: 0, z: 0.9 },
+          position: { x: 0.2, y: 0, z: 1.7 },
           rotation: { yDegrees: 45 },
         },
       ],
@@ -35,8 +35,8 @@ describe('layout schema', () => {
     );
 
     expect(result.applied).toBe(1);
-    expect(result.layout['coffee-table'].position.x).toBe(1.1);
-    expect(result.layout['coffee-table'].position.z).toBe(0.9);
+    expect(result.layout['coffee-table'].position.x).toBe(0.2);
+    expect(result.layout['coffee-table'].position.z).toBe(1.7);
     expect(result.layout['coffee-table'].rotation.yDegrees).toBe(45);
   });
 
@@ -83,5 +83,35 @@ describe('layout schema', () => {
         roomDefinition,
       ),
     ).toThrow('Imported layout has overlapping furniture.');
+  });
+
+  it('rejects a single imported item that overlaps existing furniture', () => {
+    expect(() =>
+      importLayoutFromUnknown(
+        [{ id: 'sofa', position: { x: -3.55, y: 0, z: -2.25 } }],
+        createInitialFurnitureLayout(),
+        roomDefinition,
+      ),
+    ).toThrow('Imported layout has overlapping furniture.');
+  });
+
+  it('matches later aliases when an earlier alias is unknown', () => {
+    const result = importLayoutFromUnknown(
+      {
+        furniture: [
+          {
+            id: 'unknown',
+            layoutId: 'sofa',
+            position: { x: -3, y: 0, z: 0.8 },
+          },
+        ],
+      },
+      createInitialFurnitureLayout(),
+      roomDefinition,
+    );
+
+    expect(result.applied).toBe(1);
+    expect(result.layout.sofa.position.x).toBe(-3);
+    expect(result.layout.sofa.position.z).toBe(0.8);
   });
 });

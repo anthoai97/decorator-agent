@@ -1,12 +1,9 @@
 import {
   applyTransformPatch,
-  clampTransformInsideRoom,
-  cloneLayout,
-  footprintsOverlap,
   furnitureFootprint,
   rotationAwareSize,
 } from './collision';
-import { round, snapDegrees } from './math';
+import { round } from './math';
 import type {
   Footprint,
   FurnitureId,
@@ -81,24 +78,16 @@ export function importLayoutFromUnknown(
     throw new Error('Layout JSON did not match any furniture IDs or names.');
   }
 
-  const strictLayout = applyStrictImport(matches, currentLayout, room);
+  const layout = applyImport(matches, currentLayout, room);
 
-  if (strictLayout) {
-    return { applied: matches.length, layout: strictLayout };
-  }
-
-  // Legacy imports can sit just inside the stricter interactive AABB; keep them compatible
-  // while still rejecting overlap between objects supplied by the same import payload.
-  const compatibleLayout = applyCompatibilityImport(matches, currentLayout, room);
-
-  if (hasOverlapBetweenImportedItems(compatibleLayout, matches.map((match) => match.id))) {
+  if (!layout) {
     throw new Error('Imported layout has overlapping furniture.');
   }
 
-  return { applied: matches.length, layout: compatibleLayout };
+  return { applied: matches.length, layout };
 }
 
-function applyStrictImport(
+function applyImport(
   matches: ImportMatch[],
   currentLayout: FurnitureLayoutMap,
   room: RoomDefinition,
@@ -116,52 +105,6 @@ function applyStrictImport(
   }
 
   return nextLayout;
-}
-
-function applyCompatibilityImport(
-  matches: ImportMatch[],
-  currentLayout: FurnitureLayoutMap,
-  room: RoomDefinition,
-): FurnitureLayoutMap {
-  const nextLayout = cloneLayout(currentLayout);
-
-  for (const match of matches) {
-    const item = nextLayout[match.id];
-    const nextItem: FurnitureLayoutItem = {
-      ...item,
-      position: {
-        ...item.position,
-        ...match.patch.position,
-      },
-      rotation: {
-        yDegrees: snapDegrees(match.patch.rotation?.yDegrees ?? item.rotation.yDegrees),
-      },
-    };
-
-    nextLayout[match.id] = clampTransformInsideRoom(nextItem, room);
-  }
-
-  return nextLayout;
-}
-
-function hasOverlapBetweenImportedItems(
-  layout: FurnitureLayoutMap,
-  importedIds: FurnitureId[],
-): boolean {
-  const uniqueIds = [...new Set(importedIds)];
-
-  for (let firstIndex = 0; firstIndex < uniqueIds.length; firstIndex += 1) {
-    for (let secondIndex = firstIndex + 1; secondIndex < uniqueIds.length; secondIndex += 1) {
-      const first = layout[uniqueIds[firstIndex]];
-      const second = layout[uniqueIds[secondIndex]];
-
-      if (footprintsOverlap(furnitureFootprint(first), furnitureFootprint(second))) {
-        return true;
-      }
-    }
-  }
-
-  return false;
 }
 
 function createExportItem(item: FurnitureLayoutItem): LayoutExportItem {
@@ -205,13 +148,14 @@ function findFurnitureId(
   item: Record<string, unknown>,
   layout: FurnitureLayoutMap,
 ): FurnitureId | null {
-  const candidateId = normalizeToken(item.id ?? item.layoutId);
-  const candidateName = normalizeToken(item.name ?? item.label);
+  const candidates = [item.id, item.layoutId, item.name, item.label]
+    .map(normalizeToken)
+    .filter((candidate) => candidate.length > 0);
 
   return (
     Object.values(layout).find((furniture) => (
-      normalizeToken(furniture.id) === candidateId ||
-      normalizeToken(furniture.name) === candidateName
+      candidates.includes(normalizeToken(furniture.id)) ||
+      candidates.includes(normalizeToken(furniture.name))
     ))?.id ?? null
   );
 }
