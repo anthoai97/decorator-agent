@@ -64,3 +64,39 @@ export interface ApplyTransformResult {
   reason: 'applied' | 'overlap' | 'missing-furniture';
   layout: FurnitureLayoutMap;
 }
+
+export interface LayoutExportItem {
+  id: string;
+  name: string;
+  movable: boolean;
+  position: Vector3Data;
+  rotation: {
+    yDegrees: number;
+  };
+  size: Size3Data;
+  footprint: Footprint;
+}
+
+export interface RoomLayoutExport {
+  schemaVersion: 1;
+  app: 'webgpu-room-composer';
+  units: 'meters';
+  coordinateSystem: {
+    origin: 'room-center-floor';
+    x: 'left-right';
+    y: 'up';
+    z: 'front-back';
+  };
+  constraints: {
+    keepInsideRoom: true;
+    preventFurnitureOverlap: true;
+    rotationStepDegrees: 45;
+  };
+  room: RoomDefinition;
+  furniture: LayoutExportItem[];
+}
+
+export interface ImportResult {
+  applied: number;
+  layout: FurnitureLayoutMap;
+}
