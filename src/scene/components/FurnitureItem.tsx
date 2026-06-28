@@ -16,6 +16,16 @@ interface FurnitureItemProps {
 
 type FurniturePointerEvent = ThreeEvent<PointerEvent>;
 
+interface PointerCaptureTarget {
+  hasPointerCapture: (pointerId: number) => boolean;
+  setPointerCapture: (pointerId: number) => void;
+  releasePointerCapture: (pointerId: number) => void;
+}
+
+function getPointerCaptureTarget(event: FurniturePointerEvent): PointerCaptureTarget {
+  return event.target as unknown as PointerCaptureTarget;
+}
+
 export function FurnitureItem({ item, drag, children }: FurnitureItemProps) {
   const selectedId = useRoomStore((state) => state.selectedId);
   const hoveredId = useRoomStore((state) => state.hoveredId);
@@ -31,6 +41,34 @@ export function FurnitureItem({ item, drag, children }: FurnitureItemProps) {
       new Vector3(item.position.x, item.position.y, item.position.z),
       event.ray,
     );
+
+    if (drag.isDragging()) {
+      getPointerCaptureTarget(event).setPointerCapture(event.pointerId);
+    }
+  }
+
+  function handlePointerMove(event: FurniturePointerEvent) {
+    event.stopPropagation();
+    drag.updateDrag(event.ray);
+  }
+
+  function releasePointerCapture(event: FurniturePointerEvent) {
+    const captureTarget = getPointerCaptureTarget(event);
+
+    if (captureTarget.hasPointerCapture(event.pointerId)) {
+      captureTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function handlePointerEnd(event: FurniturePointerEvent) {
+    event.stopPropagation();
+    releasePointerCapture(event);
+    drag.endDrag();
+  }
+
+  function handleLostPointerCapture(event: FurniturePointerEvent) {
+    event.stopPropagation();
+    drag.endDrag();
   }
 
   function handlePointerOver(event: FurniturePointerEvent) {
@@ -50,6 +88,10 @@ export function FurnitureItem({ item, drag, children }: FurnitureItemProps) {
       rotation={[0, radiansFromDegrees(item.rotation.yDegrees), 0]}
       userData={{ layoutId: item.id, label: item.name, movable: item.movable }}
       onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onLostPointerCapture={handleLostPointerCapture}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
     >

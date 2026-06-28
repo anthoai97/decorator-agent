@@ -10,6 +10,11 @@ interface DragSession {
   offset: Vector3;
 }
 
+interface UseFurnitureDragOptions {
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+}
+
 export interface FurnitureDragApi {
   beginDrag: (id: FurnitureId, objectPosition: Vector3, ray: Ray) => void;
   updateDrag: (ray: Ray) => void;
@@ -19,7 +24,10 @@ export interface FurnitureDragApi {
 
 const floorPlane = new Plane(new Vector3(0, 1, 0), 0);
 
-export function useFurnitureDrag(): FurnitureDragApi {
+export function useFurnitureDrag({
+  onDragStart,
+  onDragEnd,
+}: UseFurnitureDragOptions = {}): FurnitureDragApi {
   const session = useRef<DragSession | null>(null);
   const floorHit = useRef(new Vector3());
   const selectFurniture = useRoomStore((state) => state.selectFurniture);
@@ -30,13 +38,18 @@ export function useFurnitureDrag(): FurnitureDragApi {
       selectFurniture(id);
 
       if (ray.intersectPlane(floorPlane, floorHit.current)) {
+        const wasDragging = session.current !== null;
         session.current = {
           id,
           offset: objectPosition.clone().sub(floorHit.current),
         };
+
+        if (!wasDragging) {
+          onDragStart?.();
+        }
       }
     },
-    [selectFurniture],
+    [onDragStart, selectFurniture],
   );
 
   const updateDrag = useCallback(
@@ -52,8 +65,13 @@ export function useFurnitureDrag(): FurnitureDragApi {
   );
 
   const endDrag = useCallback(() => {
+    const wasDragging = session.current !== null;
     session.current = null;
-  }, []);
+
+    if (wasDragging) {
+      onDragEnd?.();
+    }
+  }, [onDragEnd]);
 
   const isDragging = useCallback(() => session.current !== null, []);
 

@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { OrbitControls } from '@react-three/drei';
-import type { ThreeEvent } from '@react-three/fiber';
 import { useThree } from '@react-three/fiber';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 import { roomDefinition } from '../data/furnitureCatalog';
 import { useRoomStore } from '../state/useRoomStore';
@@ -14,15 +14,24 @@ import { RoomShell } from './components/RoomShell';
 import { Sofa } from './components/Sofa';
 import { useFurnitureDrag } from './interactions/useFurnitureDrag';
 
-type FurniturePointerEvent = ThreeEvent<PointerEvent>;
-
 export function RoomScene() {
   const { camera } = useThree();
   const furniture = useRoomStore((state) => state.furniture);
   const selectFurniture = useRoomStore((state) => state.selectFurniture);
   const cameraMode = useRoomStore((state) => state.cameraMode);
   const setCameraMode = useRoomStore((state) => state.setCameraMode);
-  const drag = useFurnitureDrag();
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
+
+  const setControlsEnabled = useCallback((enabled: boolean) => {
+    if (controlsRef.current) {
+      controlsRef.current.enabled = enabled;
+    }
+  }, []);
+
+  const drag = useFurnitureDrag({
+    onDragStart: () => setControlsEnabled(false),
+    onDragEnd: () => setControlsEnabled(true),
+  });
 
   useEffect(() => {
     if (cameraMode !== 'top') {
@@ -33,10 +42,6 @@ export function RoomScene() {
     camera.lookAt(0, 0, 0);
     setCameraMode('orbit');
   }, [camera, cameraMode, setCameraMode]);
-
-  function handleDragMove(event: FurniturePointerEvent) {
-    drag.updateDrag(event.ray);
-  }
 
   function handleDragPlanePointerDown() {
     selectFurniture(null);
@@ -70,14 +75,12 @@ export function RoomScene() {
         position={[0, 0.01, 0]}
         rotation={[-Math.PI / 2, 0, 0]}
         onPointerDown={handleDragPlanePointerDown}
-        onPointerMove={handleDragMove}
-        onPointerUp={drag.endDrag}
-        onPointerCancel={drag.endDrag}
       >
         <planeGeometry args={[roomDefinition.width, roomDefinition.depth]} />
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
       <OrbitControls
+        ref={controlsRef}
         enableDamping
         minDistance={4.4}
         maxDistance={11}
