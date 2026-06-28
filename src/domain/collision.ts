@@ -1,3 +1,4 @@
+import { roomDefinition } from '../data/furnitureCatalog';
 import { clamp, round, snapDegrees } from './math';
 import type {
   ApplyTransformResult,
@@ -13,11 +14,6 @@ import type {
 
 const roomPadding = 0.18;
 const collisionPadding = 0.04;
-
-interface RectanglePoint {
-  x: number;
-  z: number;
-}
 
 function roundFootprint(value: number): number {
   return round(value, 3);
@@ -53,10 +49,10 @@ export function rotationAwareSize(size: Size3Data, yDegrees: number): Size3Data 
 
 export function createFootprint(position: Vector3Data, size: Size3Data): Footprint {
   return {
-    minX: position.x - size.width / 2,
-    maxX: position.x + size.width / 2,
-    minZ: position.z - size.depth / 2,
-    maxZ: position.z + size.depth / 2,
+    minX: roundFootprint(position.x - size.width / 2),
+    maxX: roundFootprint(position.x + size.width / 2),
+    minZ: roundFootprint(position.z - size.depth / 2),
+    maxZ: roundFootprint(position.z + size.depth / 2),
   };
 }
 
@@ -85,63 +81,6 @@ export function footprintsOverlap(first: Footprint, second: Footprint): boolean 
   );
 }
 
-function rectangleCorners(item: FurnitureLayoutItem): RectanglePoint[] {
-  const width = Math.max(0, item.baseSize.width - collisionPadding * 2);
-  const depth = Math.max(0, item.baseSize.depth - collisionPadding * 2);
-  const halfWidth = width / 2;
-  const halfDepth = depth / 2;
-  const radians = (snapDegrees(item.rotation.yDegrees, 45) * Math.PI) / 180;
-  const cosine = Math.cos(radians);
-  const sine = Math.sin(radians);
-
-  return [
-    { x: -halfWidth, z: -halfDepth },
-    { x: halfWidth, z: -halfDepth },
-    { x: halfWidth, z: halfDepth },
-    { x: -halfWidth, z: halfDepth },
-  ].map((corner) => ({
-    x: item.position.x + corner.x * cosine - corner.z * sine,
-    z: item.position.z + corner.x * sine + corner.z * cosine,
-  }));
-}
-
-function projectionOnAxis(points: RectanglePoint[], axis: RectanglePoint): { min: number; max: number } {
-  return points.reduce(
-    (projection, point) => {
-      const value = point.x * axis.x + point.z * axis.z;
-
-      return {
-        min: Math.min(projection.min, value),
-        max: Math.max(projection.max, value),
-      };
-    },
-    { min: Infinity, max: -Infinity },
-  );
-}
-
-function rectangleAxes(points: RectanglePoint[]): RectanglePoint[] {
-  return points.map((point, index) => {
-    const next = points[(index + 1) % points.length];
-    const edgeX = next.x - point.x;
-    const edgeZ = next.z - point.z;
-    const length = Math.hypot(edgeX, edgeZ);
-
-    return { x: -edgeZ / length, z: edgeX / length };
-  });
-}
-
-function rotatedRectanglesOverlap(first: FurnitureLayoutItem, second: FurnitureLayoutItem): boolean {
-  const firstCorners = rectangleCorners(first);
-  const secondCorners = rectangleCorners(second);
-
-  return [...rectangleAxes(firstCorners), ...rectangleAxes(secondCorners)].every((axis) => {
-    const firstProjection = projectionOnAxis(firstCorners, axis);
-    const secondProjection = projectionOnAxis(secondCorners, axis);
-
-    return firstProjection.max > secondProjection.min && secondProjection.max > firstProjection.min;
-  });
-}
-
 export function findOverlap(layout: FurnitureLayoutMap): [FurnitureId, FurnitureId] | null {
   const items = Object.values(layout);
 
@@ -150,10 +89,7 @@ export function findOverlap(layout: FurnitureLayoutMap): [FurnitureId, Furniture
       const first = items[firstIndex];
       const second = items[secondIndex];
 
-      if (
-        footprintsOverlap(furnitureFootprint(first), furnitureFootprint(second)) &&
-        rotatedRectanglesOverlap(first, second)
-      ) {
+      if (footprintsOverlap(furnitureFootprint(first), furnitureFootprint(second))) {
         return [first.id, second.id];
       }
     }
@@ -168,7 +104,7 @@ export function hasAnyOverlap(layout: FurnitureLayoutMap): boolean {
 
 export function clampTransformInsideRoom(
   item: FurnitureLayoutItem,
-  room: RoomDefinition,
+  room: RoomDefinition = roomDefinition,
 ): FurnitureLayoutItem {
   const size = rotationAwareSize(item.baseSize, item.rotation.yDegrees);
   const halfWidth = size.width / 2;
@@ -232,7 +168,7 @@ export function applyTransformPatch(
   if (hasAnyOverlap(nextLayout)) {
     return {
       applied: false,
-      clamped,
+      clamped: false,
       reason: 'overlap',
       layout,
     };

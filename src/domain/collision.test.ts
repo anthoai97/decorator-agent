@@ -41,6 +41,20 @@ describe('collision helpers', () => {
     });
   });
 
+  it('rounds footprint edges', () => {
+    expect(
+      createFootprint(
+        { x: 0.3, y: 0, z: -0.3 },
+        { width: 0.2, height: 1, depth: 0.2 },
+      ),
+    ).toEqual({
+      minX: 0.2,
+      maxX: 0.4,
+      minZ: -0.4,
+      maxZ: -0.2,
+    });
+  });
+
   it('swaps width and depth at 90 degree rotation', () => {
     expect(rotationAwareSize({ width: 2, height: 1, depth: 0.5 }, 90)).toEqual({
       width: 0.5,
@@ -61,11 +75,15 @@ describe('collision helpers', () => {
 
     const size = rotationAwareSize(clamped.baseSize, clamped.rotation.yDegrees);
     const footprint = createFootprint(clamped.position, size);
+    const minX = Number((roomDefinition.bounds.minX + 0.18).toFixed(3));
+    const maxX = Number((roomDefinition.bounds.maxX - 0.18).toFixed(3));
+    const minZ = Number((roomDefinition.bounds.minZ + 0.18).toFixed(3));
+    const maxZ = Number((roomDefinition.bounds.maxZ - 0.18).toFixed(3));
 
-    expect(footprint.minX).toBeGreaterThanOrEqual(roomDefinition.bounds.minX + 0.18);
-    expect(footprint.maxX).toBeLessThanOrEqual(roomDefinition.bounds.maxX - 0.18);
-    expect(footprint.minZ).toBeGreaterThanOrEqual(roomDefinition.bounds.minZ + 0.18);
-    expect(footprint.maxZ).toBeLessThanOrEqual(roomDefinition.bounds.maxZ - 0.18);
+    expect(footprint.minX).toBeGreaterThanOrEqual(minX);
+    expect(footprint.maxX).toBeLessThanOrEqual(maxX);
+    expect(footprint.minZ).toBeGreaterThanOrEqual(minZ);
+    expect(footprint.maxZ).toBeLessThanOrEqual(maxZ);
   });
 
   it('clamps furniture height inside room bounds', () => {
@@ -92,6 +110,20 @@ describe('collision helpers', () => {
     ).toBe(roomDefinition.height - sofa.baseSize.height);
   });
 
+  it('uses the catalog room definition by default when clamping furniture', () => {
+    const sofa = initialLayout().sofa;
+    const clamped = clampTransformInsideRoom({
+      ...sofa,
+      position: { x: -99, y: -2, z: 99 },
+    });
+    const size = rotationAwareSize(clamped.baseSize, clamped.rotation.yDegrees);
+    const footprint = createFootprint(clamped.position, size);
+
+    expect(clamped.position.y).toBe(0);
+    expect(footprint.minX).toBeGreaterThanOrEqual(-4.62);
+    expect(footprint.maxZ).toBeLessThanOrEqual(3.22);
+  });
+
   it('detects overlapping furniture', () => {
     const layout = initialLayout();
     layout['coffee-table'] = {
@@ -102,18 +134,49 @@ describe('collision helpers', () => {
     expect(findOverlap(layout)).toEqual(['sofa', 'coffee-table']);
   });
 
+  it('uses footprint overlap for rotated furniture', () => {
+    const layout = initialLayout();
+    layout['coffee-table'] = {
+      ...layout['coffee-table'],
+      position: { x: 1.2, y: 0, z: 0.3 },
+      rotation: { yDegrees: 45 },
+    };
+
+    expect(findOverlap(layout)).toEqual(['coffee-table', 'lounge-chair']);
+  });
+
   it('applies valid transform patches without mutating the input layout', () => {
     const layout = initialLayout();
     const result = applyTransformPatch(layout, roomDefinition, 'coffee-table', {
-      position: { x: 1.2, z: 0.3 },
+      position: { x: 1.2, z: 1.6 },
       rotation: { yDegrees: 45 },
     });
 
     expect(result.applied).toBe(true);
     expect(result.layout['coffee-table'].position.x).toBe(1.2);
-    expect(result.layout['coffee-table'].position.z).toBe(0.3);
+    expect(result.layout['coffee-table'].position.z).toBe(1.6);
     expect(result.layout['coffee-table'].rotation.yDegrees).toBe(45);
     expect(layout['coffee-table'].position.x).not.toBe(1.2);
+  });
+
+  it('rejects clamped overlap patches without reporting clamping', () => {
+    const layout = initialLayout();
+    layout.sofa = clampTransformInsideRoom(
+      {
+        ...layout.sofa,
+        position: { x: 99, y: 0, z: 1.4 },
+      },
+      roomDefinition,
+    );
+
+    const result = applyTransformPatch(layout, roomDefinition, 'coffee-table', {
+      position: { x: 99, z: 1.4 },
+    });
+
+    expect(result.applied).toBe(false);
+    expect(result.clamped).toBe(false);
+    expect(result.reason).toBe('overlap');
+    expect(result.layout).toBe(layout);
   });
 
   it('snaps existing rotation when applying a position-only patch', () => {
