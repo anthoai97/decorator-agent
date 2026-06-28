@@ -184,6 +184,7 @@ export function clampTransformInsideRoom(
     position: {
       ...item.position,
       x: roundFootprint(clamp(item.position.x, minX, maxX)),
+      y: clamp(item.position.y, 0, Math.max(0, room.height - item.baseSize.height)),
       z: roundFootprint(clamp(item.position.z, minZ, maxZ)),
     },
   };
@@ -215,9 +216,7 @@ export function applyTransformPatch(
       ...patch.position,
     },
     rotation: {
-      yDegrees: patch.rotation?.yDegrees === undefined
-        ? previousItem.rotation.yDegrees
-        : snapDegrees(patch.rotation.yDegrees),
+      yDegrees: snapDegrees(patch.rotation?.yDegrees ?? previousItem.rotation.yDegrees),
     },
   };
 

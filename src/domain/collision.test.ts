@@ -68,6 +68,30 @@ describe('collision helpers', () => {
     expect(footprint.maxZ).toBeLessThanOrEqual(roomDefinition.bounds.maxZ - 0.18);
   });
 
+  it('clamps furniture height inside room bounds', () => {
+    const sofa = initialLayout().sofa;
+
+    expect(
+      clampTransformInsideRoom(
+        {
+          ...sofa,
+          position: { ...sofa.position, y: -2 },
+        },
+        roomDefinition,
+      ).position.y,
+    ).toBe(0);
+
+    expect(
+      clampTransformInsideRoom(
+        {
+          ...sofa,
+          position: { ...sofa.position, y: 99 },
+        },
+        roomDefinition,
+      ).position.y,
+    ).toBe(roomDefinition.height - sofa.baseSize.height);
+  });
+
   it('detects overlapping furniture', () => {
     const layout = initialLayout();
     layout['coffee-table'] = {
@@ -90,5 +114,21 @@ describe('collision helpers', () => {
     expect(result.layout['coffee-table'].position.z).toBe(0.3);
     expect(result.layout['coffee-table'].rotation.yDegrees).toBe(45);
     expect(layout['coffee-table'].position.x).not.toBe(1.2);
+  });
+
+  it('snaps existing rotation when applying a position-only patch', () => {
+    const layout = initialLayout();
+    layout.planter = {
+      ...layout.planter,
+      rotation: { yDegrees: 23 },
+    };
+
+    const result = applyTransformPatch(layout, roomDefinition, 'planter', {
+      position: { x: -3.5 },
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.layout.planter.rotation.yDegrees).toBe(45);
+    expect(layout.planter.rotation.yDegrees).toBe(23);
   });
 });
