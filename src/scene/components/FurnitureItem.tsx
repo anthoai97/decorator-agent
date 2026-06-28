@@ -34,6 +34,10 @@ export function FurnitureItem({ item, drag, children }: FurnitureItemProps) {
   const isEmphasized = selectedId === item.id || hoveredId === item.id;
 
   function handlePointerDown(event: FurniturePointerEvent) {
+    if (event.button !== 0) {
+      return;
+    }
+
     event.stopPropagation();
     selectFurniture(item.id);
     drag.beginDrag(
