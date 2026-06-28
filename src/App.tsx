@@ -1,11 +1,11 @@
+import { RoomCanvas } from './scene/RoomCanvas';
 import { PlaygroundShell } from './ui/PlaygroundShell';
 
 export function App() {
   return (
     <main id="app">
-      <div id="viewport" />
+      <RoomCanvas />
       <PlaygroundShell />
-      <div id="webgpu-message" className="webgpu-message" role="status" hidden />
     </main>
   );
 }
