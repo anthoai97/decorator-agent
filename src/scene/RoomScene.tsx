@@ -19,8 +19,8 @@ export function RoomScene() {
       <hemisphereLight args={['#f6fbff', '#b2a28d', 2.2]} />
       <directionalLight position={[2.4, 5.2, 2.8]} intensity={2.4} />
       <directionalLight position={[-4, 3, -3]} color="#bfd7ff" intensity={0.8} />
+      <RoomShell />
       <group onPointerMissed={() => selectFurniture(null)}>
-        <RoomShell />
         <FurnitureItem item={furniture.sofa}>
           <Sofa />
         </FurnitureItem>
