@@ -42,9 +42,10 @@ export function RoomCanvas() {
 
     try {
       await renderer.init();
-    } catch (error) {
+    } catch {
+      renderer.dispose();
       setRendererInitFailed(true);
-      throw error;
+      await new Promise<never>(() => {});
     }
 
     return renderer;
