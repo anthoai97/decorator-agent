@@ -114,4 +114,56 @@ describe('layout schema', () => {
     expect(result.layout.sofa.position.x).toBe(-3);
     expect(result.layout.sofa.position.z).toBe(0.8);
   });
+
+  it('imports multi-item swaps transactionally before checking overlap', () => {
+    const result = importLayoutFromUnknown(
+      {
+        furniture: [
+          { id: 'coffee-table', position: { x: -1.5, y: 0, z: -1.55 } },
+          { id: 'sofa', position: { x: -3, y: 0, z: 0.8 } },
+        ],
+      },
+      createInitialFurnitureLayout(),
+      roomDefinition,
+    );
+
+    expect(result.applied).toBe(2);
+    expect(result.layout['coffee-table'].position.x).toBe(-1.5);
+    expect(result.layout['coffee-table'].position.z).toBe(-1.55);
+    expect(result.layout.sofa.position.x).toBe(-3);
+    expect(result.layout.sofa.position.z).toBe(0.8);
+  });
+
+  it('prefers id over conflicting lower-priority aliases', () => {
+    const result = importLayoutFromUnknown(
+      {
+        furniture: [
+          {
+            id: 'coffee-table',
+            label: 'Sofa',
+            position: { x: 0.2, y: 0, z: 1.7 },
+          },
+        ],
+      },
+      createInitialFurnitureLayout(),
+      roomDefinition,
+    );
+
+    expect(result.applied).toBe(1);
+    expect(result.layout['coffee-table'].position.x).toBe(0.2);
+    expect(result.layout['coffee-table'].position.z).toBe(1.7);
+    expect(result.layout.sofa.position.x).toBe(-1.5);
+    expect(result.layout.sofa.position.z).toBe(-1.55);
+  });
+
+  it('imports exported layout data as a round trip', () => {
+    const original = createInitialFurnitureLayout();
+    const exported = createLayoutExport(original, roomDefinition);
+    const result = importLayoutFromUnknown(exported, createInitialFurnitureLayout(), roomDefinition);
+
+    expect(result.applied).toBe(exported.furniture.length);
+    expect(result.layout.sofa.position).toEqual(original.sofa.position);
+    expect(result.layout['coffee-table'].position).toEqual(original['coffee-table'].position);
+    expect(result.layout['lounge-chair'].rotation.yDegrees).toBe(original['lounge-chair'].rotation.yDegrees);
+  });
 });

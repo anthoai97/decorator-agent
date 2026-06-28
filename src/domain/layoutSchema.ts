@@ -1,9 +1,11 @@
 import {
-  applyTransformPatch,
+  clampTransformInsideRoom,
+  cloneLayout,
   furnitureFootprint,
+  hasAnyOverlap,
   rotationAwareSize,
 } from './collision';
-import { round } from './math';
+import { round, snapDegrees } from './math';
 import type {
   Footprint,
   FurnitureId,
@@ -92,19 +94,27 @@ function applyImport(
   currentLayout: FurnitureLayoutMap,
   room: RoomDefinition,
 ): FurnitureLayoutMap | null {
-  let nextLayout = currentLayout;
+  const nextLayout = cloneLayout(currentLayout);
 
   for (const match of matches) {
-    const result = applyTransformPatch(nextLayout, room, match.id, match.patch);
+    const item = nextLayout[match.id];
 
-    if (!result.applied) {
-      return null;
-    }
-
-    nextLayout = result.layout;
+    nextLayout[match.id] = clampTransformInsideRoom(
+      {
+        ...item,
+        position: {
+          ...item.position,
+          ...match.patch.position,
+        },
+        rotation: {
+          yDegrees: snapDegrees(match.patch.rotation?.yDegrees ?? item.rotation.yDegrees),
+        },
+      },
+      room,
+    );
   }
 
-  return nextLayout;
+  return hasAnyOverlap(nextLayout) ? null : nextLayout;
 }
 
 function createExportItem(item: FurnitureLayoutItem): LayoutExportItem {
@@ -148,14 +158,33 @@ function findFurnitureId(
   item: Record<string, unknown>,
   layout: FurnitureLayoutMap,
 ): FurnitureId | null {
-  const candidates = [item.id, item.layoutId, item.name, item.label]
-    .map(normalizeToken)
-    .filter((candidate) => candidate.length > 0);
+  const candidates = [item.id, item.layoutId, item.name, item.label];
+
+  for (const candidate of candidates) {
+    const id = findCandidateFurnitureId(candidate, layout);
+
+    if (id) {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+function findCandidateFurnitureId(
+  candidate: unknown,
+  layout: FurnitureLayoutMap,
+): FurnitureId | null {
+  const token = normalizeToken(candidate);
+
+  if (token.length === 0) {
+    return null;
+  }
 
   return (
     Object.values(layout).find((furniture) => (
-      candidates.includes(normalizeToken(furniture.id)) ||
-      candidates.includes(normalizeToken(furniture.name))
+      normalizeToken(furniture.id) === token ||
+      normalizeToken(furniture.name) === token
     ))?.id ?? null
   );
 }
