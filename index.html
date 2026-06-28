@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>WebGPU Room Demo</title>
+  </head>
+  <body>
+    <main id="app">
+      <div id="viewport"></div>
+      <section class="hud" aria-label="Room controls">
+        <div class="brand">
+          <span class="brand__mark"></span>
+          <span>Room Composer</span>
+        </div>
+        <div class="status" aria-live="polite">
+          <span id="selected-name">Nothing selected</span>
+          <span id="selected-position"></span>
+          <span id="layout-status"></span>
+        </div>
+        <div class="actions">
+          <button id="rotate-object" type="button" disabled>Rotate</button>
+          <button id="export-layout" type="button">Export</button>
+          <button id="import-layout" type="button">Import</button>
+          <input id="layout-file" type="file" accept="application/json,.json" hidden />
+          <button id="top-view" type="button">Top view</button>
+          <button id="reset-layout" type="button">Reset</button>
+        </div>
+      </section>
+      <div id="webgpu-message" class="webgpu-message" role="status" hidden></div>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

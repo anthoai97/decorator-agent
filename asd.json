@@ -1,0 +1,149 @@
+{
+    "schemaVersion": 1,
+    "app": "webgpu-room-composer",
+    "units": "meters",
+    "coordinateSystem": {
+        "origin": "room-center-floor",
+        "x": "left-right",
+        "y": "up",
+        "z": "front-back"
+    },
+    "constraints": {
+        "keepInsideRoom": true,
+        "preventFurnitureOverlap": true,
+        "rotationStepDegrees": 45
+    },
+    "room": {
+        "width": 9.6,
+        "depth": 6.8,
+        "height": 2.75,
+        "bounds": {
+            "minX": -4.8,
+            "maxX": 4.8,
+            "minZ": -3.4,
+            "maxZ": 3.4
+        }
+    },
+    "furniture": [
+        {
+            "id": "sofa",
+            "name": "Sofa",
+            "movable": true,
+            "position": {
+                "x": -4.1,
+                "y": 0,
+                "z": 0
+            },
+            "rotation": {
+                "yDegrees": 90
+            },
+            "size": {
+                "width": 0.93,
+                "height": 1.21,
+                "depth": 2.49
+            },
+            "footprint": {
+                "minX": -4.25,
+                "maxX": -3.4,
+                "minZ": -0.947,
+                "maxZ": 1.463
+            }
+        },
+        {
+            "id": "coffee-table",
+            "name": "Coffee table",
+            "movable": true,
+            "position": {
+                "x": 4.1,
+                "y": 0,
+                "z": -2.95
+            },
+            "rotation": {
+                "yDegrees": 0
+            },
+            "size": {
+                "width": 1.35,
+                "height": 0.628,
+                "depth": 0.82
+            },
+            "footprint": {
+                "minX": -0.341,
+                "maxX": 0.929,
+                "minZ": -0.092,
+                "maxZ": 0.648
+            }
+        },
+        {
+            "id": "lounge-chair",
+            "name": "Lounge chair",
+            "movable": true,
+            "position": {
+                "x": -1.25,
+                "y": 0,
+                "z": 1.65
+            },
+            "rotation": {
+                "yDegrees": 225
+            },
+            "size": {
+                "width": 1.273,
+                "height": 1.235,
+                "depth": 1.303
+            },
+            "footprint": {
+                "minX": -0.792,
+                "maxX": 0.4,
+                "minZ": 0.77,
+                "maxZ": 1.994
+            }
+        },
+        {
+            "id": "bookshelf",
+            "name": "Bookshelf",
+            "movable": true,
+            "position": {
+                "x": -2.55,
+                "y": 0,
+                "z": 0
+            },
+            "rotation": {
+                "yDegrees": 0
+            },
+            "size": {
+                "width": 0.92,
+                "height": 1.56,
+                "depth": 0.34
+            },
+            "footprint": {
+                "minX": 3.74,
+                "maxX": 4.58,
+                "minZ": -3.18,
+                "maxZ": -2.92
+            }
+        },
+        {
+            "id": "planter",
+            "name": "Planter",
+            "movable": true,
+            "position": {
+                "x": -4.25,
+                "y": 0,
+                "z": -2.75
+            },
+            "rotation": {
+                "yDegrees": 0
+            },
+            "size": {
+                "width": 0.72,
+                "height": 1.133,
+                "depth": 0.867
+            },
+            "footprint": {
+                "minX": -3.87,
+                "maxX": -3.23,
+                "minZ": -2.621,
+                "maxZ": -1.834
+            }
+        }
+    ]
+}

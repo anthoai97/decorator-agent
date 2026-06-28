@@ -1,0 +1,4 @@
+interface:
+  display_name: "Room Layout Arranger"
+  short_description: "Arrange exported WebGPU room layouts."
+  default_prompt: "Arrange this exported room layout JSON and return a valid, non-overlapping importable layout using the same schema."
