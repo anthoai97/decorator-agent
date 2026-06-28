@@ -1,4 +1,11 @@
-import type { FurnitureDefinition, FurnitureLayoutMap, RoomDefinition } from '../domain/types';
+import { snapDegrees } from '../domain/math';
+import type {
+  FurnitureDefinition,
+  FurnitureId,
+  FurnitureLayoutItem,
+  FurnitureLayoutMap,
+  RoomDefinition,
+} from '../domain/types';
 
 export const roomDefinition: RoomDefinition = {
   width: 9.6,
@@ -15,18 +22,33 @@ export const furnitureCatalog: FurnitureDefinition[] = [
   { id: 'planter', name: 'Planter', movable: true, defaultPosition: { x: -3.55, y: 0, z: -2.25 }, defaultRotationYDegrees: 0, baseSize: { width: 0.72, height: 1.133, depth: 0.867 } },
 ];
 
+function requireCatalogItem(id: FurnitureId): FurnitureDefinition {
+  const item = furnitureCatalog.find((catalogItem) => catalogItem.id === id);
+
+  if (!item) {
+    throw new Error(`Missing furniture catalog item: ${id}`);
+  }
+
+  return item;
+}
+
+function createLayoutItem(item: FurnitureDefinition): FurnitureLayoutItem {
+  return {
+    id: item.id,
+    name: item.name,
+    movable: item.movable,
+    position: { ...item.defaultPosition },
+    rotation: { yDegrees: snapDegrees(item.defaultRotationYDegrees) },
+    baseSize: { ...item.baseSize },
+  };
+}
+
 export function createInitialFurnitureLayout(): FurnitureLayoutMap {
-  return Object.fromEntries(
-    furnitureCatalog.map((item) => [
-      item.id,
-      {
-        id: item.id,
-        name: item.name,
-        movable: item.movable,
-        position: { ...item.defaultPosition },
-        rotation: { yDegrees: item.defaultRotationYDegrees },
-        baseSize: { ...item.baseSize },
-      },
-    ]),
-  ) as FurnitureLayoutMap;
+  return {
+    sofa: createLayoutItem(requireCatalogItem('sofa')),
+    'coffee-table': createLayoutItem(requireCatalogItem('coffee-table')),
+    'lounge-chair': createLayoutItem(requireCatalogItem('lounge-chair')),
+    bookshelf: createLayoutItem(requireCatalogItem('bookshelf')),
+    planter: createLayoutItem(requireCatalogItem('planter')),
+  };
 }

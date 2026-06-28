@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { furnitureCatalog, roomDefinition } from '../data/furnitureCatalog';
+import {
+  createInitialFurnitureLayout,
+  furnitureCatalog,
+  roomDefinition,
+} from '../data/furnitureCatalog';
 import {
   applyTransformPatch,
   clampTransformInsideRoom,
@@ -8,23 +12,7 @@ import {
   findOverlap,
   rotationAwareSize,
 } from './collision';
-import type { FurnitureLayoutMap } from './types';
-
-function initialLayout(): FurnitureLayoutMap {
-  return Object.fromEntries(
-    furnitureCatalog.map((item) => [
-      item.id,
-      {
-        id: item.id,
-        name: item.name,
-        movable: item.movable,
-        position: { ...item.defaultPosition },
-        rotation: { yDegrees: item.defaultRotationYDegrees },
-        baseSize: { ...item.baseSize },
-      },
-    ]),
-  ) as FurnitureLayoutMap;
-}
+import type { FurnitureId } from './types';
 
 describe('collision helpers', () => {
   it('calculates a footprint from center position and size', () => {
@@ -63,8 +51,16 @@ describe('collision helpers', () => {
     });
   });
 
+  it('creates a complete non-overlapping initial layout', () => {
+    const layout = createInitialFurnitureLayout();
+
+    expect(Object.keys(layout)).toEqual(furnitureCatalog.map((item) => item.id));
+    expect(layout['lounge-chair'].rotation.yDegrees).toBe(315);
+    expect(findOverlap(layout)).toBeNull();
+  });
+
   it('clamps furniture inside room bounds', () => {
-    const sofa = initialLayout().sofa;
+    const sofa = createInitialFurnitureLayout().sofa;
     const clamped = clampTransformInsideRoom(
       {
         ...sofa,
@@ -87,7 +83,7 @@ describe('collision helpers', () => {
   });
 
   it('clamps furniture height inside room bounds', () => {
-    const sofa = initialLayout().sofa;
+    const sofa = createInitialFurnitureLayout().sofa;
 
     expect(
       clampTransformInsideRoom(
@@ -111,7 +107,7 @@ describe('collision helpers', () => {
   });
 
   it('uses the catalog room definition by default when clamping furniture', () => {
-    const sofa = initialLayout().sofa;
+    const sofa = createInitialFurnitureLayout().sofa;
     const clamped = clampTransformInsideRoom({
       ...sofa,
       position: { x: -99, y: -2, z: 99 },
@@ -125,7 +121,7 @@ describe('collision helpers', () => {
   });
 
   it('detects overlapping furniture', () => {
-    const layout = initialLayout();
+    const layout = createInitialFurnitureLayout();
     layout['coffee-table'] = {
       ...layout['coffee-table'],
       position: { ...layout.sofa.position },
@@ -135,7 +131,7 @@ describe('collision helpers', () => {
   });
 
   it('uses footprint overlap for rotated furniture', () => {
-    const layout = initialLayout();
+    const layout = createInitialFurnitureLayout();
     layout['coffee-table'] = {
       ...layout['coffee-table'],
       position: { x: 1.2, y: 0, z: 0.3 },
@@ -146,7 +142,7 @@ describe('collision helpers', () => {
   });
 
   it('applies valid transform patches without mutating the input layout', () => {
-    const layout = initialLayout();
+    const layout = createInitialFurnitureLayout();
     const result = applyTransformPatch(layout, roomDefinition, 'coffee-table', {
       position: { x: 1.2, z: 1.6 },
       rotation: { yDegrees: 45 },
@@ -159,8 +155,20 @@ describe('collision helpers', () => {
     expect(layout['coffee-table'].position.x).not.toBe(1.2);
   });
 
+  it('reports successful clamping when applying a valid transform patch', () => {
+    const layout = createInitialFurnitureLayout();
+    const result = applyTransformPatch(layout, roomDefinition, 'coffee-table', {
+      position: { x: 99, z: 1.6 },
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.clamped).toBe(true);
+    expect(result.reason).toBe('applied');
+    expect(result.layout['coffee-table'].position.x).toBeLessThan(99);
+  });
+
   it('rejects clamped overlap patches without reporting clamping', () => {
-    const layout = initialLayout();
+    const layout = createInitialFurnitureLayout();
     layout.sofa = clampTransformInsideRoom(
       {
         ...layout.sofa,
@@ -179,8 +187,20 @@ describe('collision helpers', () => {
     expect(result.layout).toBe(layout);
   });
 
+  it('returns missing-furniture when applying a patch to an unknown item', () => {
+    const layout = createInitialFurnitureLayout();
+    const result = applyTransformPatch(layout, roomDefinition, 'missing' as FurnitureId, {
+      position: { x: 0 },
+    });
+
+    expect(result.applied).toBe(false);
+    expect(result.clamped).toBe(false);
+    expect(result.reason).toBe('missing-furniture');
+    expect(result.layout).toBe(layout);
+  });
+
   it('snaps existing rotation when applying a position-only patch', () => {
-    const layout = initialLayout();
+    const layout = createInitialFurnitureLayout();
     layout.planter = {
       ...layout.planter,
       rotation: { yDegrees: 23 },
@@ -193,5 +213,18 @@ describe('collision helpers', () => {
     expect(result.applied).toBe(true);
     expect(result.layout.planter.rotation.yDegrees).toBe(45);
     expect(layout.planter.rotation.yDegrees).toBe(23);
+  });
+
+  it('keeps every initial rotation stable for position-only patches', () => {
+    const layout = createInitialFurnitureLayout();
+
+    for (const item of furnitureCatalog) {
+      const result = applyTransformPatch(layout, roomDefinition, item.id, {
+        position: { ...layout[item.id].position },
+      });
+
+      expect(result.applied).toBe(true);
+      expect(result.layout[item.id].rotation.yDegrees).toBe(layout[item.id].rotation.yDegrees);
+    }
   });
 });
