@@ -37,8 +37,8 @@ try {
     await page.waitForTimeout(900);
 
     const clickTarget = {
-      x: Math.round(viewport.width * 0.53),
-      y: Math.round(viewport.height * 0.62),
+      x: Math.round(viewport.width * (viewport.width <= 720 ? 0.5 : 0.53)),
+      y: Math.round(viewport.height * (viewport.width <= 720 ? 0.42 : 0.62)),
     };
     await page.mouse.move(clickTarget.x, clickTarget.y);
     await page.mouse.click(clickTarget.x, clickTarget.y);
@@ -57,6 +57,7 @@ try {
     const result = await page.evaluate(() => {
       const canvas = document.querySelector('canvas');
       const hud = document.querySelector('.hud');
+      const sidePanel = document.querySelector('.side-panel');
       const webgpuMessage = document.querySelector('#webgpu-message');
       const selectedName = document.querySelector('#selected-name');
       const selectedPosition = document.querySelector('#selected-position');
@@ -65,6 +66,14 @@ try {
 
       if (!canvas) {
         return { ok: false, reason: 'missing canvas' };
+      }
+
+      if (!hud || !sidePanel || !selectedName || !selectedPosition || !rotateButton) {
+        return { ok: false, reason: 'missing React shell controls' };
+      }
+
+      if (!debug) {
+        return { ok: false, reason: 'missing debug API' };
       }
 
       const probe = document.createElement('canvas');
@@ -93,32 +102,19 @@ try {
 
       const canvasBox = canvas.getBoundingClientRect();
       const hudBox = hud.getBoundingClientRect();
-      const messageVisible = webgpuMessage && !webgpuMessage.hidden;
-      const interchange = (() => {
-        if (!debug) {
-          return null;
-        }
+      const sidePanelBox = sidePanel.getBoundingClientRect();
+      const messageVisible = Boolean(webgpuMessage && !webgpuMessage.hidden);
+      const exported = debug.exportLayout();
+      const validImport = debug.importLayout(exported);
+      const invalid = structuredClone(exported);
+      invalid.furniture[1].position = { ...invalid.furniture[0].position };
+      let invalidRejected = false;
 
-        const exported = debug.exportLayout();
-        const validImport = debug.importLayout(exported);
-        const invalid = structuredClone(exported);
-        invalid.furniture[1].position = { ...invalid.furniture[0].position };
-        let invalidRejected = false;
-
-        try {
-          debug.importLayout(invalid);
-        } catch {
-          invalidRejected = true;
-        }
-
-        return {
-          schemaVersion: exported.schemaVersion,
-          furnitureCount: exported.furniture.length,
-          validApplied: validImport.applied,
-          invalidRejected,
-          hasAnyOverlap: debug.hasAnyOverlap(),
-        };
-      })();
+      try {
+        debug.importLayout(invalid);
+      } catch {
+        invalidRejected = true;
+      }
 
       return {
         ok: !messageVisible,
@@ -136,12 +132,24 @@ try {
           right: Math.round(hudBox.right),
           bottom: Math.round(hudBox.bottom),
         },
+        sidePanel: {
+          top: Math.round(sidePanelBox.top),
+          left: Math.round(sidePanelBox.left),
+          right: Math.round(sidePanelBox.right),
+          bottom: Math.round(sidePanelBox.bottom),
+        },
         messageVisible,
         selectedName: selectedName.textContent,
         selectedPosition: selectedPosition.textContent,
         rotateDisabled: rotateButton.disabled,
-        hasAnyOverlap: window.__roomComposerDebug?.hasAnyOverlap(),
-        interchange,
+        hasAnyOverlap: debug.hasAnyOverlap(),
+        interchange: {
+          schemaVersion: exported.schemaVersion,
+          furnitureCount: exported.furniture.length,
+          validApplied: validImport.applied,
+          invalidRejected,
+          hasAnyOverlap: debug.hasAnyOverlap(),
+        },
       };
     });
 
@@ -178,6 +186,15 @@ try {
     const hudFits = result.hud.left >= 0 && result.hud.right <= viewport.width && result.hud.bottom < viewport.height;
     if (!hudFits) {
       throw new Error(`${viewport.name}: HUD layout escapes viewport: ${JSON.stringify(result.hud)}`);
+    }
+
+    const sidePanelFits =
+      result.sidePanel.left >= 0 &&
+      result.sidePanel.right <= viewport.width &&
+      result.sidePanel.top >= 0 &&
+      result.sidePanel.bottom < viewport.height;
+    if (!sidePanelFits) {
+      throw new Error(`${viewport.name}: side panel layout escapes viewport: ${JSON.stringify(result.sidePanel)}`);
     }
 
     console.log(
