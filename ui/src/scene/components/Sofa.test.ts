@@ -1,5 +1,4 @@
 import { readFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
@@ -19,7 +18,7 @@ type GlbJson = {
 };
 
 const GLB_JSON_CHUNK_TYPE = 0x4e4f534a;
-const SOFA_ASSET_PATH = resolve(process.cwd(), 'public/assets/models/sofa-01.glb');
+const SOFA_ASSET_URL = new URL('../../../public/assets/models/sofa-01.glb', import.meta.url);
 
 describe('Sofa model contract', () => {
   it('uses the supplied sofa GLB from public assets', () => {
@@ -71,12 +70,12 @@ describe('Sofa model contract', () => {
 });
 
 function readSofaGlbMetadata() {
-  const data = readFileSync(SOFA_ASSET_PATH);
+  const data = readFileSync(SOFA_ASSET_URL) as Buffer;
   const json = readGlbJson(data);
 
   return {
     json,
-    kilobytes: statSync(SOFA_ASSET_PATH).size / 1024,
+    kilobytes: statSync(SOFA_ASSET_URL).size / 1024,
   };
 }
 
