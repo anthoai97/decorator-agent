@@ -125,6 +125,7 @@ function createExportItem(item: FurnitureLayoutItem): LayoutExportItem {
     id: item.id,
     name: item.name,
     movable: item.movable,
+    blocksPlacement: item.blocksPlacement,
     position: roundVector3(item.position),
     rotation: {
       yDegrees: round(item.rotation.yDegrees, 1),

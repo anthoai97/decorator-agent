@@ -12,6 +12,7 @@ import { FurnitureItem } from './components/FurnitureItem';
 import { LoungeChair } from './components/LoungeChair';
 import { Planter } from './components/Planter';
 import { RoomShell } from './components/RoomShell';
+import { Rug } from './components/Rug';
 import { Sofa } from './components/Sofa';
 import { useFurnitureDrag, type FurnitureMoveCommit } from './interactions/useFurnitureDrag';
 
@@ -102,6 +103,11 @@ export function RoomScene() {
         {furniture.planter ? (
           <FurnitureItem item={furniture.planter} drag={drag}>
             <Planter />
+          </FurnitureItem>
+        ) : null}
+        {furniture.rug ? (
+          <FurnitureItem item={furniture.rug} drag={drag}>
+            <Rug />
           </FurnitureItem>
         ) : null}
       </group>

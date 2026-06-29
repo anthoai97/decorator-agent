@@ -1,4 +1,4 @@
-export type FurnitureId = 'sofa' | 'coffee-table' | 'lounge-chair' | 'bookshelf' | 'planter';
+export type FurnitureId = 'sofa' | 'coffee-table' | 'lounge-chair' | 'bookshelf' | 'planter' | 'rug';
 
 export interface Vector3Data {
   x: number;
@@ -37,6 +37,7 @@ export interface FurnitureDefinition {
   id: FurnitureId;
   name: string;
   movable: boolean;
+  blocksPlacement: boolean;
   defaultPosition: Vector3Data;
   defaultRotationYDegrees: number;
   baseSize: Size3Data;
@@ -46,6 +47,7 @@ export interface FurnitureLayoutItem {
   id: FurnitureId;
   name: string;
   movable: boolean;
+  blocksPlacement: boolean;
   position: Vector3Data;
   rotation: { yDegrees: number };
   baseSize: Size3Data;
@@ -69,6 +71,7 @@ export interface LayoutExportItem {
   id: string;
   name: string;
   movable: boolean;
+  blocksPlacement: boolean;
   position: Vector3Data;
   rotation: {
     yDegrees: number;

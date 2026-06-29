@@ -55,8 +55,23 @@ describe('collision helpers', () => {
     const layout = createInitialFurnitureLayout();
 
     expect(Object.keys(layout)).toEqual(furnitureCatalog.map((item) => item.id));
+    expect(layout.rug.name).toBe('Area rug');
+    expect(layout.rug.movable).toBe(true);
+    expect(layout.rug.blocksPlacement).toBe(false);
     expect(layout['lounge-chair'].rotation.yDegrees).toBe(315);
     expect(findOverlap(layout)).toBeNull();
+  });
+
+  it('moves the area rug without treating floor-covering overlap as furniture collision', () => {
+    const layout = createInitialFurnitureLayout();
+    const result = applyTransformPatch(layout, roomDefinition, 'rug', {
+      position: { x: 0.55, z: 0.25 },
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.layout.rug.position.x).toBe(0.55);
+    expect(result.layout.rug.position.z).toBe(0.25);
+    expect(findOverlap(result.layout)).toBeNull();
   });
 
   it('clamps furniture inside room bounds', () => {

@@ -27,6 +27,7 @@ export function cloneLayout(layout: FurnitureLayoutMap): FurnitureLayoutMap {
         id: item.id,
         name: item.name,
         movable: item.movable,
+        blocksPlacement: item.blocksPlacement,
         position: { ...item.position },
         rotation: { ...item.rotation },
         baseSize: { ...item.baseSize },
@@ -82,7 +83,7 @@ export function footprintsOverlap(first: Footprint, second: Footprint): boolean 
 }
 
 export function findOverlap(layout: FurnitureLayoutMap): [FurnitureId, FurnitureId] | null {
-  const items = Object.values(layout);
+  const items = Object.values(layout).filter((item) => item.blocksPlacement !== false);
 
   for (let firstIndex = 0; firstIndex < items.length; firstIndex += 1) {
     for (let secondIndex = firstIndex + 1; secondIndex < items.length; secondIndex += 1) {

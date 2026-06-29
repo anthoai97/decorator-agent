@@ -64,6 +64,41 @@ class SQLiteStoreTests(unittest.TestCase):
 
             second_store.close()
 
+    def test_load_state_reconciles_legacy_state_with_catalog_defaults(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SQLiteStore(Path(directory) / "state.sqlite3")
+            command = validate_command({"type": "RESET_LAYOUT", "payload": {}})
+            legacy_state = create_initial_state()
+            legacy_state["revision"] = 1
+            legacy_state["furniture"]["coffee-table"]["position"]["x"] = -2.762
+            del legacy_state["furniture"]["rug"]
+            del legacy_state["furniture"]["sofa"]["blocksPlacement"]
+            store.record_accepted_command(command, [create_state_event(command, legacy_state)], legacy_state)
+
+            loaded_state = store.load_state()
+
+            self.assertIn("rug", loaded_state["furniture"])
+            self.assertFalse(loaded_state["furniture"]["rug"]["blocksPlacement"])
+            self.assertTrue(loaded_state["furniture"]["sofa"]["blocksPlacement"])
+            self.assertEqual(loaded_state["furniture"]["coffee-table"]["position"]["x"], -2.762)
+
+            store.close()
+
+    def test_load_state_keeps_currently_removed_furniture_removed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SQLiteStore(Path(directory) / "state.sqlite3")
+            command = validate_command({"type": "REMOVE_FURNITURE", "payload": {"furnitureId": "rug"}})
+            state = create_initial_state()
+            state["revision"] = 1
+            del state["furniture"]["rug"]
+            store.record_accepted_command(command, [create_state_event(command, state)], state)
+
+            loaded_state = store.load_state()
+
+            self.assertNotIn("rug", loaded_state["furniture"])
+
+            store.close()
+
     def test_lists_events_after_id(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = SQLiteStore(Path(directory) / "state.sqlite3")

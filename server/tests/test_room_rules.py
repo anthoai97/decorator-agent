@@ -23,6 +23,20 @@ class RoomRuleTests(unittest.TestCase):
         self.assertEqual(layout["lounge-chair"]["rotation"]["yDegrees"], 315)
         self.assertIsNone(find_overlap(layout))
 
+    def test_moves_area_rug_without_treating_floor_covering_as_collision(self) -> None:
+        state = create_initial_state()
+        result = apply_transform_patch(
+            state["furniture"],
+            state["room"],
+            "rug",
+            {"position": {"x": 0.55, "z": 0.25}},
+        )
+
+        self.assertTrue(result["applied"])
+        self.assertEqual(result["layout"]["rug"]["position"]["x"], 0.55)
+        self.assertEqual(result["layout"]["rug"]["position"]["z"], 0.25)
+        self.assertIsNone(find_overlap(result["layout"]))
+
     def test_rotation_aware_size_matches_render_footprint(self) -> None:
         self.assertEqual(
             rotation_aware_size({"width": 2, "height": 1, "depth": 0.5}, 90),

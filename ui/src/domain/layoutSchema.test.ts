@@ -17,7 +17,9 @@ describe('layout schema', () => {
       'lounge-chair',
       'bookshelf',
       'planter',
+      'rug',
     ]);
+    expect(exported.furniture.find((item) => item.id === 'rug')?.blocksPlacement).toBe(false);
   });
 
   it('imports compact furniture arrays by id', () => {

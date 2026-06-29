@@ -72,7 +72,7 @@ def footprints_overlap(first: JsonObject, second: JsonObject) -> bool:
 
 
 def find_overlap(layout: JsonObject) -> tuple[str, str] | None:
-    items = list(layout.values())
+    items = [item for item in layout.values() if item.get("blocksPlacement") is not False]
 
     for first_index, first in enumerate(items):
         for second in items[first_index + 1 :]:

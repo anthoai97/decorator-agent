@@ -31,9 +31,19 @@ class StateModelTests(unittest.TestCase):
 
         self.assertEqual(sofa["name"], "Sofa")
         self.assertTrue(sofa["movable"])
+        self.assertTrue(sofa["blocksPlacement"])
         self.assertEqual(sofa["position"], {"x": -1.5, "y": 0, "z": -1.55})
         self.assertEqual(sofa["rotation"], {"yDegrees": 0})
         self.assertEqual(sofa["baseSize"], {"width": 2.49, "height": 1.21, "depth": 0.93})
+
+    def test_initial_state_includes_movable_non_blocking_area_rug(self) -> None:
+        rug = create_initial_state()["furniture"]["rug"]
+
+        self.assertEqual(rug["name"], "Area rug")
+        self.assertTrue(rug["movable"])
+        self.assertFalse(rug["blocksPlacement"])
+        self.assertEqual(rug["position"], {"x": 0.45, "y": 0, "z": 0.3})
+        self.assertEqual(rug["baseSize"], {"width": 2.7, "height": 0.025, "depth": 1.75})
 
     def test_initial_state_returns_independent_copies(self) -> None:
         first = create_initial_state()

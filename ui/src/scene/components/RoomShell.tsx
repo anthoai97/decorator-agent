@@ -11,10 +11,6 @@ export function RoomShell() {
         <boxGeometry args={[roomDefinition.width, 0.08, roomDefinition.depth]} />
         <meshStandardMaterial color="#d7b98f" roughness={0.72} metalness={0.02} />
       </mesh>
-      <mesh name="Area rug" position={[0.45, 0.018, 0.3]}>
-        <boxGeometry args={[2.7, 0.025, 1.75]} />
-        <meshStandardMaterial color="#54748a" roughness={0.9} />
-      </mesh>
       <mesh position={[0, wallHeight / 2, -halfDepth]}>
         <boxGeometry args={[roomDefinition.width, wallHeight, 0.12]} />
         <meshStandardMaterial color="#d8e7ea" roughness={0.84} />

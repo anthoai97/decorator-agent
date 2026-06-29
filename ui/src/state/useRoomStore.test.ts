@@ -40,8 +40,8 @@ describe('useRoomStore', () => {
     const result = useRoomStore.getState().importLayout(exported);
 
     expect(exported.schemaVersion).toBe(1);
-    expect(result.applied).toBe(5);
-    expect(useRoomStore.getState().layoutStatus).toBe('Imported 5 objects');
+    expect(result.applied).toBe(exported.furniture.length);
+    expect(useRoomStore.getState().layoutStatus).toBe(`Imported ${exported.furniture.length} objects`);
   });
 
   it('hydrates authoritative server state snapshots', () => {

@@ -198,6 +198,7 @@ function cloneObjectives(objectives: Objective[]): Objective[] {
 function cloneFurnitureItem(item: FurnitureLayoutItem): FurnitureLayoutItem {
   return {
     ...item,
+    blocksPlacement: item.blocksPlacement,
     position: { ...item.position },
     rotation: { ...item.rotation },
     baseSize: { ...item.baseSize },
