@@ -1,28 +1,79 @@
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, FocusEvent } from 'react';
+import { useEffect, useState } from 'react';
 
-import type { FurnitureId } from '../domain/types';
+import type { FurnitureId, FurnitureLayoutItem } from '../domain/types';
 import { useRoomStore } from '../state/useRoomStore';
 
 type InspectorField = 'x' | 'z' | 'rotation';
+type InspectorDrafts = Record<InspectorField, string>;
+
+const emptyDrafts: InspectorDrafts = {
+  x: '',
+  z: '',
+  rotation: '',
+};
+
+function getFieldValue(item: FurnitureLayoutItem, field: InspectorField): number {
+  if (field === 'rotation') {
+    return item.rotation.yDegrees;
+  }
+
+  return item.position[field];
+}
+
+function createDrafts(item: FurnitureLayoutItem | null): InspectorDrafts {
+  if (!item) {
+    return emptyDrafts;
+  }
+
+  return {
+    x: String(item.position.x),
+    z: String(item.position.z),
+    rotation: String(item.rotation.yDegrees),
+  };
+}
 
 export function InspectorPanel() {
   const selectedId = useRoomStore((state) => state.selectedId);
   const selected = useRoomStore((state) => (state.selectedId ? state.furniture[state.selectedId] : null));
   const setTransformFromInspector = useRoomStore((state) => state.setTransformFromInspector);
+  const [drafts, setDrafts] = useState<InspectorDrafts>(emptyDrafts);
+
+  useEffect(() => {
+    setDrafts(createDrafts(selected));
+  }, [selected, selectedId]);
 
   function updateNumber(id: FurnitureId, field: InspectorField, event: ChangeEvent<HTMLInputElement>) {
+    const draft = event.target.value;
+    const value = Number(draft);
+
+    setDrafts((current) => ({ ...current, [field]: draft }));
+
+    if (draft.trim() === '' || !Number.isFinite(value)) {
+      return;
+    }
+
+    const result = field === 'rotation'
+      ? setTransformFromInspector(id, { rotation: { yDegrees: value } })
+      : setTransformFromInspector(id, { position: { [field]: value } });
+    const nextItem = result.layout[id];
+
+    if (nextItem) {
+      setDrafts((current) => ({ ...current, [field]: String(getFieldValue(nextItem, field)) }));
+    }
+  }
+
+  function resetInvalidDraft(field: InspectorField, event: FocusEvent<HTMLInputElement>) {
     const value = Number(event.target.value);
 
-    if (!Number.isFinite(value)) {
+    if (event.target.value.trim() !== '' && Number.isFinite(value)) {
       return;
     }
 
-    if (field === 'rotation') {
-      setTransformFromInspector(id, { rotation: { yDegrees: value } });
-      return;
-    }
-
-    setTransformFromInspector(id, { position: { [field]: value } });
+    setDrafts((current) => ({
+      ...current,
+      [field]: selected ? String(getFieldValue(selected, field)) : '',
+    }));
   }
 
   return (
@@ -38,28 +89,31 @@ export function InspectorPanel() {
             <label>
               <span>X</span>
               <input
-                type="number"
-                step="0.1"
-                value={selected.position.x}
+                type="text"
+                inputMode="decimal"
+                value={drafts.x}
                 onChange={(event) => updateNumber(selectedId, 'x', event)}
+                onBlur={(event) => resetInvalidDraft('x', event)}
               />
             </label>
             <label>
               <span>Z</span>
               <input
-                type="number"
-                step="0.1"
-                value={selected.position.z}
+                type="text"
+                inputMode="decimal"
+                value={drafts.z}
                 onChange={(event) => updateNumber(selectedId, 'z', event)}
+                onBlur={(event) => resetInvalidDraft('z', event)}
               />
             </label>
             <label>
               <span>Rotation</span>
               <input
-                type="number"
-                step="45"
-                value={selected.rotation.yDegrees}
+                type="text"
+                inputMode="numeric"
+                value={drafts.rotation}
                 onChange={(event) => updateNumber(selectedId, 'rotation', event)}
+                onBlur={(event) => resetInvalidDraft('rotation', event)}
               />
             </label>
           </div>

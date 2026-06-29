@@ -43,6 +43,22 @@ try {
     await page.mouse.move(clickTarget.x, clickTarget.y);
     await page.mouse.click(clickTarget.x, clickTarget.y);
     await page.waitForTimeout(300);
+    const inspectorXInput = page.locator('.field-grid input').nth(1);
+    const originalXValue = await inspectorXInput.inputValue();
+    await inspectorXInput.fill('');
+    await inspectorXInput.type('-');
+    const partialXValue = await inspectorXInput.inputValue();
+    if (partialXValue !== '-') {
+      throw new Error(`${viewport.name}: inspector X input rejected partial negative value: ${partialXValue}`);
+    }
+    await inspectorXInput.type('1');
+    await page.waitForTimeout(300);
+    const committedXValue = await inspectorXInput.inputValue();
+    if (Number(committedXValue) !== -1) {
+      throw new Error(`${viewport.name}: inspector X input did not commit negative value: ${committedXValue}`);
+    }
+    await inspectorXInput.fill(originalXValue);
+    await page.waitForTimeout(300);
     const rotationBefore = await page.locator('#selected-position').textContent();
     await page.click('#rotate-object');
     await page.waitForTimeout(300);
