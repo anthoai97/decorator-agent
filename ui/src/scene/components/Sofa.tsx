@@ -1,40 +1,68 @@
+import { useMemo } from 'react';
+import { useGLTF } from '@react-three/drei';
+import type { Object3D } from 'three';
+
+type Vector3Tuple = [number, number, number];
+
+const SOFA_SOURCE_SIZE = {
+  width: 0.363525390625,
+  height: 0.2578582763671875,
+  depth: 1,
+};
+const SOFA_SOURCE_MIN_Y = -0.1289215087890625;
+const SOFA_TARGET_WIDTH = 2.49;
+const SOFA_TARGET_HEIGHT = 0.8;
+const SOFA_MODEL_XZ_SCALE = SOFA_TARGET_WIDTH / SOFA_SOURCE_SIZE.depth;
+const SOFA_MODEL_Y_SCALE = SOFA_TARGET_HEIGHT / SOFA_SOURCE_SIZE.height;
+
+export const SOFA_MODEL_URL = '/assets/models/sofa-01.glb';
+export const SOFA_MODEL_TRANSFORM: {
+  position: Vector3Tuple;
+  rotation: Vector3Tuple;
+  scale: Vector3Tuple;
+} = {
+  position: [0, -SOFA_SOURCE_MIN_Y * SOFA_MODEL_Y_SCALE, 0],
+  rotation: [0, Math.PI / 2, 0],
+  scale: [SOFA_MODEL_XZ_SCALE, SOFA_MODEL_Y_SCALE, SOFA_MODEL_XZ_SCALE],
+};
+
+export function getScaledSofaModelSize() {
+  return {
+    width: roundMeters(SOFA_SOURCE_SIZE.depth * SOFA_MODEL_TRANSFORM.scale[2]),
+    height: roundMeters(SOFA_SOURCE_SIZE.height * SOFA_MODEL_TRANSFORM.scale[1]),
+    depth: roundMeters(SOFA_SOURCE_SIZE.width * SOFA_MODEL_TRANSFORM.scale[0]),
+  };
+}
+
 export function Sofa() {
+  const gltf = useGLTF(SOFA_MODEL_URL);
+  const sofaScene = useMemo(() => cloneWithShadows(gltf.scene), [gltf.scene]);
+
   return (
     <group name="Sofa geometry">
-      <mesh position={[0, 0.38, 0]} castShadow receiveShadow>
-        <boxGeometry args={[2.05, 0.34, 0.78]} />
-        <meshStandardMaterial color="#3d6f84" roughness={0.86} />
-      </mesh>
-      <mesh position={[0, 0.78, -0.39]} castShadow receiveShadow>
-        <boxGeometry args={[2.15, 0.86, 0.22]} />
-        <meshStandardMaterial color="#2c5364" roughness={0.9} />
-      </mesh>
-      {[
-        [-1.13, 0.62, 0.02],
-        [1.13, 0.62, 0.02],
-      ].map(([x, y, z]) => (
-        <mesh key={x} position={[x, y, z]} castShadow receiveShadow>
-          <boxGeometry args={[0.23, 0.62, 0.82]} />
-          <meshStandardMaterial color="#2c5364" roughness={0.9} />
-        </mesh>
-      ))}
-      {[-0.52, 0.52].map((x) => (
-        <mesh key={x} position={[x, 0.61, 0.08]} castShadow receiveShadow>
-          <boxGeometry args={[0.88, 0.12, 0.68]} />
-          <meshStandardMaterial color="#3d6f84" roughness={0.86} />
-        </mesh>
-      ))}
-      {[
-        [-0.82, 0.13, 0.32],
-        [0.82, 0.13, 0.32],
-        [-0.82, 0.13, -0.32],
-        [0.82, 0.13, -0.32],
-      ].map(([x, y, z]) => (
-        <mesh key={`${x}-${z}`} position={[x, y, z]} castShadow receiveShadow>
-          <cylinderGeometry args={[0.045, 0.055, 0.26, 10]} />
-          <meshStandardMaterial color="#46372f" roughness={0.72} />
-        </mesh>
-      ))}
+      <primitive
+        object={sofaScene}
+        position={SOFA_MODEL_TRANSFORM.position}
+        rotation={SOFA_MODEL_TRANSFORM.rotation}
+        scale={SOFA_MODEL_TRANSFORM.scale}
+      />
     </group>
   );
 }
+
+function cloneWithShadows(scene: Object3D) {
+  const clone = scene.clone(true);
+
+  clone.traverse((child) => {
+    child.castShadow = true;
+    child.receiveShadow = true;
+  });
+
+  return clone;
+}
+
+function roundMeters(value: number) {
+  return Number(value.toFixed(2));
+}
+
+useGLTF.preload(SOFA_MODEL_URL);

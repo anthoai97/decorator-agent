@@ -265,9 +265,10 @@ async function selectFurnitureForSmoke(page, viewport) {
   const candidates =
     viewport.width <= 720
       ? [
-          { x: 0.28, y: 0.47 },
+          { x: 0.55, y: 0.5 },
+          { x: 0.45, y: 0.5 },
+          { x: 0.28, y: 0.5 },
           { x: 0.72, y: 0.61 },
-          { x: 0.5, y: 0.52 },
         ]
       : [
           { x: 0.53, y: 0.62 },
@@ -286,8 +287,12 @@ async function selectFurnitureForSmoke(page, viewport) {
 
     const selectedName = await page.locator('#selected-name').textContent();
     const inspectorInputCount = await page.locator('.field-grid input').count();
+    const targetStillOnCanvas = await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.tagName === 'CANVAS',
+      clickTarget,
+    );
 
-    if (selectedName !== 'Nothing selected' && inspectorInputCount >= 3) {
+    if (selectedName !== 'Nothing selected' && inspectorInputCount >= 3 && targetStillOnCanvas) {
       return clickTarget;
     }
   }
