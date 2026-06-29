@@ -12,7 +12,7 @@
 
 ## Reference Inputs
 
-- Approved design: `docs/superpowers/specs/2026-06-28-react-r3f-room-composer-design.md`
+- Approved design: `docs/specs/2026-06-28-react-r3f-room-composer-design.md`
 - Current app entry: `src/main.js`
 - Current styles: `src/styles.css`
 - Current smoke test: `scripts/smoke.mjs`
