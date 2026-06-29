@@ -2,12 +2,12 @@
 
 ## Objective
 
-Replace the current hand-built sofa mesh with `sofa-01.glb` so the room renders the supplied model while keeping the existing sofa layout behavior unchanged.
+Replace the current hand-built sofa mesh with an optimized `sofa-01.glb` so the room renders the supplied model while keeping the existing sofa layout behavior unchanged.
 
 ## Tech Stack
 
 - React 19 with React Three Fiber.
-- Three.js and `@react-three/drei` for GLB loading.
+- Three.js and `@react-three/drei` for GLB loading, with Meshopt decoding enabled.
 - Vite public assets for serving the model.
 
 ## Commands
@@ -18,7 +18,7 @@ Replace the current hand-built sofa mesh with `sofa-01.glb` so the room renders 
 
 ## Project Structure
 
-- `ui/public/assets/models/sofa-01.glb` stores the runtime model asset.
+- `ui/public/assets/models/sofa-01.glb` stores the Meshopt-compressed runtime model asset.
 - `ui/src/scene/components/Sofa.tsx` owns sofa rendering.
 - `ui/src/scene/components/Sofa.test.ts` verifies the asset contract and transform constants.
 
@@ -26,9 +26,11 @@ Replace the current hand-built sofa mesh with `sofa-01.glb` so the room renders 
 
 ```tsx
 export const SOFA_MODEL_URL = '/assets/models/sofa-01.glb';
+export const SOFA_USE_DRACO = false;
+export const SOFA_USE_MESHOPT = true;
 
 export function Sofa() {
-  const gltf = useGLTF(SOFA_MODEL_URL);
+  const gltf = useGLTF(SOFA_MODEL_URL, SOFA_USE_DRACO, SOFA_USE_MESHOPT);
   return <primitive object={gltf.scene} />;
 }
 ```
@@ -37,18 +39,33 @@ Keep the component focused on rendering. Preserve the existing `FurnitureItem` w
 
 ## Testing Strategy
 
-Use a small Vitest unit test for the sofa model URL and transform contract, then run the existing UI test suite and build.
+Use a small Vitest unit test for the sofa model URL, decoder settings, and transform contract, then run the existing UI test suite, build, and browser smoke.
 
 ## Boundaries
 
 - Always: Keep sofa ID, footprint, drag behavior, collision, server state, and import/export schemas unchanged.
-- Ask first: Changing the sofa dimensions, adding compression pipelines, or adding runtime dependencies.
+- Ask first: Changing the sofa dimensions, switching to Draco, or adding runtime dependencies.
 - Never: Remove the existing furniture interaction wrapper or persist model-specific transient state.
 
 ## Success Criteria
 
-- The rendered sofa uses `sofa-01.glb` instead of the fake box/cylinder geometry.
+- The rendered sofa uses the optimized `sofa-01.glb` instead of the fake box/cylinder geometry.
+- The sofa GLB is Meshopt-compressed and loads without the Draco decoder path.
 - The model is scaled and rotated to fit the existing sofa footprint.
 - The model sits on the room floor.
 - UI tests and build pass.
 
+## Asset Decision
+
+Use the Meshopt-compressed profile generated from the source sofa:
+
+```bash
+node tools/glb-compress/bin/compress-glb.mjs \
+  samples_artifact/3d/sofa-01.glb \
+  /tmp/sofa-01.optimized.glb \
+  --ratio 0.15 \
+  --error 0.01 \
+  --compress meshopt
+```
+
+This keeps the runtime model around 394 KB and 42k triangles, while avoiding the Draco loader path.

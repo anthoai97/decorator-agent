@@ -16,6 +16,8 @@ const SOFA_MODEL_XZ_SCALE = SOFA_TARGET_WIDTH / SOFA_SOURCE_SIZE.depth;
 const SOFA_MODEL_Y_SCALE = SOFA_TARGET_HEIGHT / SOFA_SOURCE_SIZE.height;
 
 export const SOFA_MODEL_URL = '/assets/models/sofa-01.glb';
+export const SOFA_USE_DRACO = false;
+export const SOFA_USE_MESHOPT = true;
 export const SOFA_MODEL_TRANSFORM: {
   position: Vector3Tuple;
   rotation: Vector3Tuple;
@@ -35,7 +37,7 @@ export function getScaledSofaModelSize() {
 }
 
 export function Sofa() {
-  const gltf = useGLTF(SOFA_MODEL_URL);
+  const gltf = useGLTF(SOFA_MODEL_URL, SOFA_USE_DRACO, SOFA_USE_MESHOPT);
   const sofaScene = useMemo(() => cloneWithShadows(gltf.scene), [gltf.scene]);
 
   return (
@@ -65,4 +67,4 @@ function roundMeters(value: number) {
   return Number(value.toFixed(2));
 }
 
-useGLTF.preload(SOFA_MODEL_URL);
+useGLTF.preload(SOFA_MODEL_URL, SOFA_USE_DRACO, SOFA_USE_MESHOPT);
