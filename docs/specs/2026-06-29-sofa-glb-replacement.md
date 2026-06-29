@@ -65,7 +65,8 @@ node tools/glb-compress/bin/compress-glb.mjs \
   /tmp/sofa-01.optimized.glb \
   --ratio 0.5 \
   --error 0.001 \
-  --compress meshopt
+  --compress meshopt \
+  --texture false
 ```
 
-This keeps the runtime model around 949 KB and 132k triangles, while avoiding the Draco loader path. The sofa component should use a simple invisible interaction box for picking and dragging so the detailed GLB is visual-only and does not make pointer raycasts expensive.
+This keeps the runtime model around 1.0 MB and 132k triangles, while avoiding the Draco loader path. Preserve the source JPEG textures instead of converting to WebP: texture bytes are small relative to the mesh, and preserving them gives better material quality without changing the geometry budget that affects dragging performance. The sofa component should use a simple invisible interaction box for picking and dragging so the detailed GLB is visual-only and does not make pointer raycasts expensive.

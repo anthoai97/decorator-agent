@@ -44,6 +44,22 @@ node tools/glb-compress/bin/compress-glb.mjs input.glb output.glb --compress mes
 node tools/glb-compress/bin/compress-glb.mjs input.glb output.glb --compress draco
 ```
 
+Balanced sofa profile:
+
+```bash
+node tools/glb-compress/bin/compress-glb.mjs \
+  samples_artifact/3d/sofa-01.glb \
+  /tmp/sofa-01.optimized.glb \
+  --ratio 0.5 \
+  --error 0.001 \
+  --compress meshopt \
+  --texture false
+```
+
+This keeps the source JPEG textures while using Meshopt and conservative geometry
+simplification, which preserves material quality without making pointer interaction
+expensive.
+
 ## Defaults
 
 - `--ratio 0.35`
@@ -67,4 +83,3 @@ npx --yes @gltf-transform/cli@4.4.0 optimize input.glb output.glb --compress qua
 cd tools/glb-compress
 npm test
 ```
-
