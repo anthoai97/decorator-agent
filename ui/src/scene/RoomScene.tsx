@@ -15,6 +15,7 @@ import { RoomShell } from './components/RoomShell';
 import { Rug } from './components/Rug';
 import { Sofa } from './components/Sofa';
 import { useFurnitureDrag, type FurnitureMoveCommit } from './interactions/useFurnitureDrag';
+import { DEFAULT_CAMERA_TARGET, TOP_VIEW_CAMERA_POSITION } from './roomView';
 
 export function RoomScene() {
   const { camera } = useThree();
@@ -63,7 +64,7 @@ export function RoomScene() {
       return;
     }
 
-    camera.position.set(0, 8.8, 0.001);
+    camera.position.set(...TOP_VIEW_CAMERA_POSITION);
     camera.lookAt(0, 0, 0);
     setCameraMode('orbit');
   }, [camera, cameraMode, setCameraMode]);
@@ -125,7 +126,7 @@ export function RoomScene() {
         minDistance={4.4}
         maxDistance={11}
         maxPolarAngle={Math.PI * 0.48}
-        target={[0, 1.05, 0]}
+        target={DEFAULT_CAMERA_TARGET}
       />
     </>
   );

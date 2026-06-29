@@ -1,9 +1,9 @@
 import { roomDefinition } from '../../data/furnitureCatalog';
+import { createRoomWallPanels } from '../roomView';
 
 export function RoomShell() {
-  const halfWidth = roomDefinition.width / 2;
   const halfDepth = roomDefinition.depth / 2;
-  const wallHeight = roomDefinition.height;
+  const wallPanels = createRoomWallPanels(roomDefinition);
 
   return (
     <group name="Room">
@@ -11,26 +11,10 @@ export function RoomShell() {
         <boxGeometry args={[roomDefinition.width, 0.08, roomDefinition.depth]} />
         <meshStandardMaterial color="#d7b98f" roughness={0.72} metalness={0.02} />
       </mesh>
-      <mesh position={[0, wallHeight / 2, -halfDepth]}>
-        <boxGeometry args={[roomDefinition.width, wallHeight, 0.12]} />
-        <meshStandardMaterial color="#d8e7ea" roughness={0.84} />
-      </mesh>
-      <mesh position={[-halfWidth, wallHeight / 2, 0]}>
-        <boxGeometry args={[0.12, wallHeight, roomDefinition.depth]} />
-        <meshStandardMaterial color="#f4f0e8" roughness={0.85} />
-      </mesh>
-      <mesh position={[halfWidth, wallHeight / 2, 0]}>
-        <boxGeometry args={[0.12, wallHeight, roomDefinition.depth]} />
-        <meshStandardMaterial color="#f4f0e8" roughness={0.85} />
-      </mesh>
-      {[
-        [0, 0.14, -halfDepth + 0.08, roomDefinition.width, 0.12, 0.08],
-        [-halfWidth + 0.08, 0.14, 0, 0.08, 0.12, roomDefinition.depth],
-        [halfWidth - 0.08, 0.14, 0, 0.08, 0.12, roomDefinition.depth],
-      ].map(([x, y, z, width, height, depth], index) => (
-        <mesh key={index} position={[x, y, z]}>
-          <boxGeometry args={[width, height, depth]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.68} />
+      {wallPanels.map((wall) => (
+        <mesh key={wall.id} name={`${wall.id} wall`} position={wall.position}>
+          <boxGeometry args={wall.size} />
+          <meshStandardMaterial color={wall.color} roughness={wall.roughness} />
         </mesh>
       ))}
       <group position={[-2.1, 1.7, -halfDepth + 0.071]}>

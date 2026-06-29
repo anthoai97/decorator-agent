@@ -37,13 +37,7 @@ try {
     await page.waitForSelector('canvas', { timeout: 15000 });
     await page.waitForTimeout(900);
 
-    const clickTarget = {
-      x: Math.round(viewport.width * (viewport.width <= 720 ? 0.5 : 0.53)),
-      y: Math.round(viewport.height * (viewport.width <= 720 ? 0.42 : 0.62)),
-    };
-    await page.mouse.move(clickTarget.x, clickTarget.y);
-    await page.mouse.click(clickTarget.x, clickTarget.y);
-    await page.waitForTimeout(300);
+    const clickTarget = await selectFurnitureForSmoke(page, viewport);
     const inspectorXInput = page.locator('.field-grid input').nth(1);
     const originalXValue = await inspectorXInput.inputValue();
     await inspectorXInput.fill('');
@@ -227,6 +221,40 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function selectFurnitureForSmoke(page, viewport) {
+  const candidates =
+    viewport.width <= 720
+      ? [
+          { x: 0.28, y: 0.47 },
+          { x: 0.72, y: 0.61 },
+          { x: 0.5, y: 0.52 },
+        ]
+      : [
+          { x: 0.53, y: 0.62 },
+          { x: 0.5, y: 0.5 },
+        ];
+
+  for (const candidate of candidates) {
+    const clickTarget = {
+      x: Math.round(viewport.width * candidate.x),
+      y: Math.round(viewport.height * candidate.y),
+    };
+
+    await page.mouse.move(clickTarget.x, clickTarget.y);
+    await page.mouse.click(clickTarget.x, clickTarget.y);
+    await page.waitForTimeout(300);
+
+    const selectedName = await page.locator('#selected-name').textContent();
+    const inspectorInputCount = await page.locator('.field-grid input').count();
+
+    if (selectedName !== 'Nothing selected' && inspectorInputCount >= 3) {
+      return clickTarget;
+    }
+  }
+
+  throw new Error(`${viewport.name}: smoke selection did not hit furniture`);
 }
 
 function analyzePng(buffer) {

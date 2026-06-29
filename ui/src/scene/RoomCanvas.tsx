@@ -4,6 +4,7 @@ import WebGPU from 'three/addons/capabilities/WebGPU.js';
 
 import { RoomScene } from './RoomScene';
 import { THREE } from './r3f-webgpu';
+import { DEFAULT_CAMERA_FOV, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_TARGET } from './roomView';
 
 type WebGpuRendererProps = {
   canvas: unknown;
@@ -58,9 +59,10 @@ export function RoomCanvas() {
   return (
     <div id="viewport">
       <Canvas
-        camera={{ fov: 48, near: 0.1, far: 100, position: [5.8, 4.2, 6.4] }}
+        camera={{ fov: DEFAULT_CAMERA_FOV, near: 0.1, far: 100, position: DEFAULT_CAMERA_POSITION }}
         dpr={[1, 1.8]}
         gl={createRenderer}
+        onCreated={({ camera }) => camera.lookAt(...DEFAULT_CAMERA_TARGET)}
       >
         <RoomScene />
       </Canvas>
