@@ -1,4 +1,6 @@
 export type FurnitureId = 'sofa' | 'coffee-table' | 'lounge-chair' | 'bookshelf' | 'planter' | 'rug';
+export type RoomWallId = 'front' | 'back' | 'left' | 'right';
+export type WallObjectId = 'window' | 'wall-art';
 
 export interface Vector3Data {
   x: number;
@@ -55,6 +57,42 @@ export interface FurnitureLayoutItem {
 
 export type FurnitureLayoutMap = Record<FurnitureId, FurnitureLayoutItem>;
 
+export interface WallObjectPosition {
+  u: number;
+  y: number;
+}
+
+export interface WallObjectMovePatch {
+  wallId?: RoomWallId;
+  position: WallObjectPosition;
+}
+
+export interface WallObjectDefinition {
+  id: WallObjectId;
+  name: string;
+  wallId: RoomWallId;
+  movable: boolean;
+  defaultPosition: WallObjectPosition;
+  size: Size3Data;
+  normalOffset: number;
+}
+
+export interface WallObjectLayoutItem {
+  id: WallObjectId;
+  name: string;
+  wallId: RoomWallId;
+  movable: boolean;
+  position: WallObjectPosition;
+  size: Size3Data;
+  normalOffset: number;
+}
+
+export type WallObjectLayoutMap = Record<WallObjectId, WallObjectLayoutItem>;
+
+export type DragMeasurementTarget =
+  | { type: 'furniture'; id: FurnitureId }
+  | { type: 'wallObject'; id: WallObjectId };
+
 export interface TransformPatch {
   position?: Partial<Vector3Data>;
   rotation?: { yDegrees?: number };
@@ -65,6 +103,13 @@ export interface ApplyTransformResult {
   clamped: boolean;
   reason: 'applied' | 'overlap' | 'missing-furniture';
   layout: FurnitureLayoutMap;
+}
+
+export interface ApplyWallObjectMoveResult {
+  applied: boolean;
+  clamped: boolean;
+  reason: 'applied' | 'missing-wall-object';
+  wallObjects: WallObjectLayoutMap;
 }
 
 export interface LayoutExportItem {
@@ -78,6 +123,15 @@ export interface LayoutExportItem {
   };
   size: Size3Data;
   footprint: Footprint;
+}
+
+export interface WallObjectLayoutExportItem {
+  id: string;
+  name: string;
+  wallId: RoomWallId;
+  movable: boolean;
+  position: WallObjectPosition;
+  size: Size3Data;
 }
 
 export interface RoomLayoutExport {
@@ -97,9 +151,11 @@ export interface RoomLayoutExport {
   };
   room: RoomDefinition;
   furniture: LayoutExportItem[];
+  wallObjects?: WallObjectLayoutExportItem[];
 }
 
 export interface ImportResult {
   applied: number;
   layout: FurnitureLayoutMap;
+  wallObjects?: WallObjectLayoutMap;
 }

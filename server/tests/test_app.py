@@ -130,6 +130,7 @@ class RequestHandlerTests(unittest.TestCase):
         self.assertEqual(body["revision"], 0)
         self.assertEqual(body["lastEventId"], 0)
         self.assertIn("sofa", body["state"]["furniture"])
+        self.assertIn("window", body["state"]["wallObjects"])
 
     def test_canonical_command_endpoint_executes_command(self) -> None:
         status, body = self.post_json(
@@ -147,6 +148,24 @@ class RequestHandlerTests(unittest.TestCase):
 
         _, state_body = self.get_json("/api/state")
         self.assertEqual(state_body["state"]["furniture"]["coffee-table"]["position"]["x"], 1.2)
+
+    def test_canonical_command_endpoint_executes_wall_object_move(self) -> None:
+        status, body = self.post_json(
+            "/api/commands",
+            {
+                "type": "MOVE_WALL_OBJECT",
+                "payload": {"wallObjectId": "window", "wallId": "left", "position": {"u": 0.5, "y": 1.4}},
+            },
+        )
+
+        self.assertEqual(status, 200)
+        self.assertTrue(body["result"]["accepted"])
+        self.assertEqual(body["result"]["events"][0]["patch"]["wallObjects"]["window"]["wallId"], "left")
+        self.assertEqual(body["result"]["events"][0]["patch"]["wallObjects"]["window"]["position"], {"u": 0.5, "y": 1.4})
+
+        _, state_body = self.get_json("/api/state")
+        self.assertEqual(state_body["state"]["wallObjects"]["window"]["wallId"], "left")
+        self.assertEqual(state_body["state"]["wallObjects"]["window"]["position"], {"u": 0.5, "y": 1.4})
 
     def test_playground_command_endpoint_returns_event(self) -> None:
         status, body = self.post_json("/api/playground/commands", {"type": "RESET_LAYOUT", "payload": {}})

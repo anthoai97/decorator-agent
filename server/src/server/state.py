@@ -72,12 +72,37 @@ FURNITURE_CATALOG: tuple[JsonObject, ...] = (
 
 FURNITURE_IDS = {item["id"] for item in FURNITURE_CATALOG}
 
+WALL_OBJECT_CATALOG: tuple[JsonObject, ...] = (
+    {
+        "id": "window",
+        "name": "Window",
+        "wallId": "back",
+        "movable": True,
+        "defaultPosition": {"u": -2.1, "y": 1.7},
+        "size": {"width": 1.52, "height": 1.02, "depth": 0.05},
+        "normalOffset": 0.071,
+    },
+    {
+        "id": "wall-art",
+        "name": "Wall art",
+        "wallId": "back",
+        "movable": True,
+        "defaultPosition": {"u": 1.85, "y": 1.55},
+        "size": {"width": 1, "height": 0.72, "depth": 0.075},
+        "normalOffset": 0.09,
+    },
+)
+
+WALL_OBJECT_IDS = {item["id"] for item in WALL_OBJECT_CATALOG}
+ROOM_WALL_IDS = {"front", "back", "left", "right"}
+
 
 def create_initial_state() -> JsonObject:
     return {
         "revision": 0,
         "room": deepcopy(ROOM_DEFINITION),
         "furniture": {item["id"]: create_furniture_item(item) for item in FURNITURE_CATALOG},
+        "wallObjects": {item["id"]: create_wall_object_item(item) for item in WALL_OBJECT_CATALOG},
         "objectives": [],
     }
 
@@ -89,6 +114,7 @@ def reset_layout_state(state: JsonObject) -> JsonObject:
         "revision": int(state.get("revision", 0)) + 1,
         "room": initial_state["room"],
         "furniture": initial_state["furniture"],
+        "wallObjects": initial_state["wallObjects"],
     }
 
 
@@ -101,6 +127,18 @@ def create_furniture_item(item: JsonObject) -> JsonObject:
         "position": deepcopy(item["defaultPosition"]),
         "rotation": {"yDegrees": snap_degrees(item["defaultRotationYDegrees"])},
         "baseSize": deepcopy(item["baseSize"]),
+    }
+
+
+def create_wall_object_item(item: JsonObject) -> JsonObject:
+    return {
+        "id": item["id"],
+        "name": item["name"],
+        "wallId": item["wallId"],
+        "movable": item["movable"],
+        "position": deepcopy(item["defaultPosition"]),
+        "size": deepcopy(item["size"]),
+        "normalOffset": item["normalOffset"],
     }
 
 

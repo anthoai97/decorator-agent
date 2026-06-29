@@ -9,6 +9,7 @@ from typing import Any
 JsonObject = dict[str, Any]
 
 TRANSFORM_COMMANDS = {"MOVE_FURNITURE", "SET_FURNITURE_ROTATION"}
+WALL_OBJECT_TRANSFORM_COMMANDS = {"MOVE_WALL_OBJECT"}
 OBJECTIVE_COMMANDS = {"ADD_OBJECTIVE", "DELETE_OBJECTIVE"}
 
 
@@ -21,6 +22,14 @@ def create_state_event(command: JsonObject, state: JsonObject) -> JsonObject:
         return create_patch_event(
             revision,
             {"furniture": {furniture_id: deepcopy(state["furniture"][furniture_id])}},
+            command,
+        )
+
+    if command_type in WALL_OBJECT_TRANSFORM_COMMANDS:
+        wall_object_id = command["payload"]["wallObjectId"]
+        return create_patch_event(
+            revision,
+            {"wallObjects": {wall_object_id: deepcopy(state["wallObjects"][wall_object_id])}},
             command,
         )
 

@@ -1,4 +1,11 @@
-import type { FurnitureId, FurnitureLayoutMap, RoomDefinition } from '../domain/types';
+import type {
+  FurnitureId,
+  FurnitureLayoutMap,
+  RoomDefinition,
+  RoomWallId,
+  WallObjectId,
+  WallObjectLayoutMap,
+} from '../domain/types';
 
 export type PlaygroundCommand =
   | { type: 'ADD_OBJECTIVE'; payload: { title: string } }
@@ -12,7 +19,11 @@ export type PlaygroundCommand =
 
 export type ServerCommand =
   | PlaygroundCommand
-  | { type: 'MOVE_FURNITURE'; payload: { furnitureId: FurnitureId; position: { x: number; z: number } } };
+  | { type: 'MOVE_FURNITURE'; payload: { furnitureId: FurnitureId; position: { x: number; z: number } } }
+  | {
+      type: 'MOVE_WALL_OBJECT';
+      payload: { wallObjectId: WallObjectId; wallId: RoomWallId; position: { u: number; y: number } };
+    };
 
 export interface ServerEvent {
   id: string;
@@ -32,6 +43,7 @@ export interface ServerRoomState {
   revision: number;
   room: RoomDefinition;
   furniture: FurnitureLayoutMap;
+  wallObjects?: WallObjectLayoutMap;
   objectives: Objective[];
 }
 
@@ -48,6 +60,7 @@ export interface ServerStreamEvent {
   revision?: number;
   patch?: {
     furniture?: Partial<Record<FurnitureId, ServerRoomState['furniture'][FurnitureId] | null>>;
+    wallObjects?: Partial<Record<keyof WallObjectLayoutMap, WallObjectLayoutMap[keyof WallObjectLayoutMap] | null>>;
     objectives?: Objective[];
   };
   state?: ServerRoomState;

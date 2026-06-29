@@ -44,6 +44,7 @@ export function useFurnitureDrag({
   const floorHit = useRef(new Vector3());
   const selectFurniture = useRoomStore((state) => state.selectFurniture);
   const moveFurniture = useRoomStore((state) => state.moveFurniture);
+  const setActiveDragMeasurementTarget = useRoomStore((state) => state.setActiveDragMeasurementTarget);
 
   const beginDrag = useCallback(
     (id: FurnitureId, objectPosition: Vector3, ray: Ray) => {
@@ -57,13 +58,14 @@ export function useFurnitureDrag({
           startPosition: { x: objectPosition.x, z: objectPosition.z },
           lastPosition: { x: objectPosition.x, z: objectPosition.z },
         };
+        setActiveDragMeasurementTarget({ type: 'furniture', id });
 
         if (!wasDragging) {
           onDragStart?.();
         }
       }
     },
-    [onDragStart, selectFurniture],
+    [onDragStart, selectFurniture, setActiveDragMeasurementTarget],
   );
 
   const updateDrag = useCallback(
@@ -92,13 +94,14 @@ export function useFurnitureDrag({
     session.current = null;
 
     if (wasDragging) {
+      setActiveDragMeasurementTarget(null);
       onDragEnd?.();
     }
 
     if (commit) {
       onDragCommit?.(commit);
     }
-  }, [onDragCommit, onDragEnd]);
+  }, [onDragCommit, onDragEnd, setActiveDragMeasurementTarget]);
 
   const isDragging = useCallback(() => session.current !== null, []);
 

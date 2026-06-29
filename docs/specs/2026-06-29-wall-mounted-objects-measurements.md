@@ -8,8 +8,8 @@ Success means existing floor-furniture movement, collision, persistence, and ser
 
 ## Assumptions
 
-1. The window and wall image stay mounted to their current wall, initially the back wall.
-2. Dragging moves wall objects horizontally along the wall and vertically on the wall. It does not move them onto the floor or across to another wall.
+1. The window and wall image start mounted to the back wall.
+2. Dragging moves wall objects horizontally and vertically on a wall plane. When the drag targets another rendered wall plane, the object may jump to that wall and continue clamping in that wall's local coordinates.
 3. Floor furniture measurements show room-wall gaps on the floor plane: left, right, front, and back, in meters.
 4. Wall object measurements show wall-local gaps: left, right, top, and bottom, in meters.
 5. Measurements are visual-only transient UI. They are derived during drag and are not persisted.
@@ -144,7 +144,6 @@ Floor furniture measurement math should read the existing furniture footprint an
   - Changing layout `schemaVersion` from `1` to `2`.
   - Adding new runtime dependencies beyond existing React/R3F/Drei/Three/Zustand.
   - Adding inspector editing for wall objects.
-  - Allowing wall objects to move between walls.
 - Never:
   - Treat wall objects as floor furniture for collision.
   - Persist transient measurement overlay state to the server.
@@ -154,8 +153,8 @@ Floor furniture measurement math should read the existing furniture footprint an
 
 ## Success Criteria
 
-- Users can drag the window within the back wall.
-- Users can drag the wall image within the back wall.
+- Users can drag the window within a wall and onto another rendered wall.
+- Users can drag the wall image within a wall and onto another rendered wall.
 - Users can drag existing floor furniture and see room-wall distance measurements during movement.
 - Dragged wall objects remain attached to the wall plane and clamp before crossing wall edges, floor, or ceiling.
 - During floor-furniture drag, measurement guides and meter labels show left, right, front, and back room-wall distances.
@@ -172,7 +171,6 @@ Floor furniture measurement math should read the existing furniture footprint an
 - Should the inspector support numeric `u` and `y` editing for wall objects in the first implementation? This plan assumes no.
 - Should floor-furniture measurements show all four room-wall gaps or only nearest-edge gaps? This plan assumes all four.
 - Should wall-object measurements show all four wall-local gaps or only nearest-edge gaps? This plan assumes all four.
-- Should wall object movement be allowed across different walls later? This plan assumes no for the first implementation.
 - Should the public layout schema move to `schemaVersion: 2`? This plan assumes no until explicitly approved.
 
 ## Architecture Decisions
@@ -180,7 +178,7 @@ Floor furniture measurement math should read the existing furniture footprint an
 - Model wall-mounted objects separately from furniture. Floor furniture uses world `x/z`, rotation, footprints, and overlap rules. Wall objects use wall-local `u/y`, wall bounds, and no floor collision.
 - Store wall object positions in wall-local coordinates. This keeps clamping and measurement calculations simple and makes the same domain code work for all four walls.
 - Render wall details from state, not hard-coded meshes in `RoomShell`. `RoomShell` should own wall/floor geometry; `WallObjectsLayer` should own window/art rendering.
-- Use the same visible-wall filtering as room walls. If a wall is hidden by `openWallIds`, its mounted objects should also be hidden so they do not float without their wall.
+- Use the same visible-wall filtering as room walls. If a wall is hidden by `openWallIds`, its mounted objects should also be hidden so they do not float without their wall. During drag, target wall hopping should prefer rendered walls.
 - Derive measurements from the actively dragged object, regardless of type. The active drag reference should be a discriminated union of furniture and wall object ids; the distances themselves are computed from current layout every render.
 - Keep measurement math shared and domain-level. Floor furniture measurements use existing footprint and room bounds; wall object measurements use wall-local size and wall bounds.
 - Add a backward-compatible export extension: keep `schemaVersion: 1` and existing `furniture` unchanged, and add an optional `wallObjects` array. Imports without `wallObjects` continue to work.
@@ -240,7 +238,7 @@ Shared drag measurement math
 
 **Acceptance criteria:**
 - [ ] Store initializes `wallObjects` from the wall object catalog.
-- [ ] `moveWallObject(id, position)` clamps wall-local `u/y` and updates state.
+- [ ] `moveWallObject(id, patch)` clamps wall-local `u/y`, can update `wallId`, and updates state.
 - [ ] Reset restores wall objects along with furniture.
 - [ ] Server snapshots and patches can hydrate `wallObjects`.
 - [ ] Export includes optional `wallObjects` without changing the existing `furniture` array shape.
@@ -279,7 +277,7 @@ Shared drag measurement math
 
 **Acceptance criteria:**
 - [ ] Initial server state includes `wallObjects` matching UI defaults.
-- [ ] `MOVE_WALL_OBJECT` validates known wall object ids and finite wall-local `u/y` coordinates.
+- [ ] `MOVE_WALL_OBJECT` validates known wall object ids, optional known `wallId`, and finite wall-local `u/y` coordinates.
 - [ ] Valid wall object moves increment revision, persist state, and emit `room.state.patch` with only the changed wall object.
 - [ ] Invalid wall object moves are rejected without mutating state.
 - [ ] Reset restores wall objects and preserves objectives.
@@ -347,12 +345,13 @@ Shared drag measurement math
 **Description:** Implement wall object pointer drag behavior using wall-plane ray intersections, pointer capture, OrbitControls disabling, local store updates, and server move commits. Update the existing furniture drag flow to publish the same active drag measurement lifecycle used by wall objects.
 
 **Acceptance criteria:**
-- [ ] Left mouse drag moves `window` along the back wall plane.
-- [ ] Left mouse drag moves `wall-art` along the back wall plane.
+- [ ] Left mouse drag moves `window` along a wall plane.
+- [ ] Left mouse drag moves `wall-art` along a wall plane.
+- [ ] Dragging a wall object onto another rendered wall changes its `wallId`.
 - [ ] Dragging clamps at wall boundaries instead of letting objects leave the wall.
 - [ ] OrbitControls are disabled during furniture and wall object drags and restored afterward.
 - [ ] No server command is sent when the pointer does not move the wall object.
-- [ ] A moved wall object sends `MOVE_WALL_OBJECT` with `{ wallObjectId, position: { u, y } }`.
+- [ ] A moved wall object sends `MOVE_WALL_OBJECT` with `{ wallObjectId, wallId, position: { u, y } }`.
 - [ ] Existing furniture drag sets active measurement target to `{ type: 'furniture', id }` while dragging.
 - [ ] Wall object drag sets active measurement target to `{ type: 'wallObject', id }` while dragging.
 - [ ] Pointer up, cancel, and lost capture all end the drag session and clear the active measurement target.

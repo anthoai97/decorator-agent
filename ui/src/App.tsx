@@ -23,6 +23,14 @@ function DebugHooks() {
           z: Number(item.position.z.toFixed(3)),
           rotation: Number(item.rotation.yDegrees.toFixed(1)),
         })),
+      wallObjects: () =>
+        Object.values(useRoomStore.getState().wallObjects).map((item) => ({
+          id: item.id,
+          name: item.name,
+          wallId: item.wallId,
+          u: Number(item.position.u.toFixed(3)),
+          y: Number(item.position.y.toFixed(3)),
+        })),
     };
 
     return () => {

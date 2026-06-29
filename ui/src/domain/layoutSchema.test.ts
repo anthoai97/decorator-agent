@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { createInitialFurnitureLayout, roomDefinition } from '../data/furnitureCatalog';
+import { createInitialWallObjectLayout } from '../data/wallObjectCatalog';
 import { createLayoutExport, importLayoutFromUnknown } from './layoutSchema';
 
 describe('layout schema', () => {
   it('exports schema version 1 with all furniture', () => {
-    const exported = createLayoutExport(createInitialFurnitureLayout(), roomDefinition);
+    const exported = createLayoutExport(createInitialFurnitureLayout(), roomDefinition, createInitialWallObjectLayout());
 
     expect(exported.schemaVersion).toBe(1);
     expect(exported.app).toBe('webgpu-room-composer');
@@ -20,6 +21,8 @@ describe('layout schema', () => {
       'rug',
     ]);
     expect(exported.furniture.find((item) => item.id === 'rug')?.blocksPlacement).toBe(false);
+    expect(exported.wallObjects?.map((item) => item.id)).toEqual(['window', 'wall-art']);
+    expect(exported.wallObjects?.find((item) => item.id === 'wall-art')?.position).toEqual({ u: 1.85, y: 1.55 });
   });
 
   it('imports compact furniture arrays by id', () => {
@@ -160,12 +163,54 @@ describe('layout schema', () => {
 
   it('imports exported layout data as a round trip', () => {
     const original = createInitialFurnitureLayout();
-    const exported = createLayoutExport(original, roomDefinition);
-    const result = importLayoutFromUnknown(exported, createInitialFurnitureLayout(), roomDefinition);
+    const wallObjects = createInitialWallObjectLayout();
+    const exported = createLayoutExport(original, roomDefinition, wallObjects);
+    const result = importLayoutFromUnknown(
+      exported,
+      createInitialFurnitureLayout(),
+      roomDefinition,
+      createInitialWallObjectLayout(),
+    );
 
-    expect(result.applied).toBe(exported.furniture.length);
+    expect(result.applied).toBe(exported.furniture.length + (exported.wallObjects?.length ?? 0));
     expect(result.layout.sofa.position).toEqual(original.sofa.position);
     expect(result.layout['coffee-table'].position).toEqual(original['coffee-table'].position);
     expect(result.layout['lounge-chair'].rotation.yDegrees).toBe(original['lounge-chair'].rotation.yDegrees);
+    expect(result.wallObjects?.window.position).toEqual(wallObjects.window.position);
+  });
+
+  it('imports wall object layout data without changing furniture compatibility', () => {
+    const result = importLayoutFromUnknown(
+      {
+        wallObjects: [
+          {
+            id: 'window',
+            wallId: 'right',
+            position: { u: 0.6, y: 1.25 },
+          },
+        ],
+      },
+      createInitialFurnitureLayout(),
+      roomDefinition,
+      createInitialWallObjectLayout(),
+    );
+
+    expect(result.applied).toBe(1);
+    expect(result.wallObjects?.window.wallId).toBe('right');
+    expect(result.wallObjects?.window.position).toEqual({ u: 0.6, y: 1.25 });
+    expect(result.layout.sofa.position.x).toBe(-0.9);
+  });
+
+  it('preserves wall objects when imported layout omits wall object data', () => {
+    const wallObjects = createInitialWallObjectLayout();
+    const result = importLayoutFromUnknown(
+      [{ id: 'coffee-table', position: { x: 0.2, y: 0, z: 1.25 } }],
+      createInitialFurnitureLayout(),
+      roomDefinition,
+      wallObjects,
+    );
+
+    expect(result.applied).toBe(1);
+    expect(result.wallObjects).toEqual(wallObjects);
   });
 });

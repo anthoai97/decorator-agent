@@ -12,7 +12,7 @@ import type {
   Vector3Data,
 } from './types';
 
-const roomPadding = 0.18;
+const roomPadding = 0;
 const collisionPadding = 0.04;
 
 function roundFootprint(value: number): number {

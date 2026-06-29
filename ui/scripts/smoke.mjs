@@ -25,6 +25,7 @@ try {
   for (const viewport of viewports) {
     const page = await browser.newPage({ viewport });
     const errors = [];
+    const postedCommands = [];
 
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => {
@@ -32,8 +33,25 @@ try {
         errors.push(message.text());
       }
     });
+    page.on('request', (request) => {
+      if (request.method() !== 'POST' || !request.url().endsWith('/api/commands')) {
+        return;
+      }
 
-    await page.goto(url, { waitUntil: 'networkidle' });
+      const postData = request.postData();
+
+      if (!postData) {
+        return;
+      }
+
+      try {
+        postedCommands.push(JSON.parse(postData));
+      } catch {
+        errors.push(`${viewport.name}: command POST body was not valid JSON`);
+      }
+    });
+
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('canvas', { timeout: 15000 });
     await page.waitForTimeout(900);
     await page.click('#reset-layout');
@@ -75,8 +93,17 @@ try {
     await page.mouse.move(Math.round(viewport.width * 0.49), Math.round(viewport.height * 0.47), {
       steps: 24,
     });
+    await page.waitForTimeout(100);
+    const furnitureMeasurementCount = await page.locator('.drag-measurement').count();
+    if (furnitureMeasurementCount < 1) {
+      throw new Error(`${viewport.name}: furniture drag did not render measurement labels`);
+    }
     await page.mouse.up();
     await page.waitForTimeout(300);
+    const furnitureMeasurementAfterMouseUp = await page.locator('.drag-measurement').count();
+    if (furnitureMeasurementAfterMouseUp !== 0) {
+      throw new Error(`${viewport.name}: furniture drag measurements remained after mouse up`);
+    }
 
     const result = await page.evaluate(() => {
       const canvas = document.querySelector('canvas');
@@ -170,12 +197,16 @@ try {
         interchange: {
           schemaVersion: exported.schemaVersion,
           furnitureCount: exported.furniture.length,
+          wallObjectCount: exported.wallObjects?.length ?? 0,
           validApplied: validImport.applied,
           invalidRejected,
           hasAnyOverlap: debug.hasAnyOverlap(),
         },
       };
     });
+
+    await dragWallObjectForSmoke(page, viewport);
+    assertWallObjectMoveCommandForSmoke(postedCommands, viewport);
 
     await page.screenshot({ path: `smoke-${viewport.name}.png`, fullPage: true });
     const canvasScreenshot = await page.locator('canvas').screenshot({
@@ -196,6 +227,7 @@ try {
       result.hasAnyOverlap !== false ||
       result.interchange?.schemaVersion !== 1 ||
       result.interchange?.furnitureCount < 5 ||
+      result.interchange?.wallObjectCount < 2 ||
       result.interchange?.validApplied < 5 ||
       !result.interchange?.invalidRejected ||
       result.interchange?.hasAnyOverlap !== false ||
@@ -261,6 +293,92 @@ async function selectFurnitureForSmoke(page, viewport) {
   }
 
   throw new Error(`${viewport.name}: smoke selection did not hit furniture`);
+}
+
+async function dragWallObjectForSmoke(page, viewport) {
+  const debugTargets = await page.evaluate(() => window.__roomComposerDebug.wallObjectScreenTargets?.() ?? []);
+  const candidates =
+    debugTargets.length > 0
+      ? debugTargets.map((target) => ({ x: target.x / viewport.width, y: target.y / viewport.height }))
+      : viewport.width <= 720
+        ? [
+          { x: 0.58, y: 0.34 },
+          { x: 0.48, y: 0.36 },
+          { x: 0.64, y: 0.4 },
+          { x: 0.42, y: 0.42 },
+        ]
+        : [
+          { x: 0.57, y: 0.36 },
+          { x: 0.52, y: 0.4 },
+          { x: 0.43, y: 0.36 },
+          { x: 0.62, y: 0.42 },
+        ];
+
+  for (const candidate of candidates) {
+    const start = {
+      x: Math.round(viewport.width * candidate.x),
+      y: Math.round(viewport.height * candidate.y),
+    };
+    const end = {
+      x: Math.round(start.x - viewport.width * 0.035),
+      y: Math.round(start.y - viewport.height * 0.035),
+    };
+    const before = await page.evaluate(() => window.__roomComposerDebug.wallObjects());
+
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps: 18 });
+    await page.waitForTimeout(100);
+    const measurementCount = await page.locator('.drag-measurement').count();
+    await page.mouse.up();
+    await page.waitForTimeout(250);
+
+    const after = await page.evaluate(() => window.__roomComposerDebug.wallObjects());
+    const measurementAfterMouseUp = await page.locator('.drag-measurement').count();
+
+    if (measurementCount > 0 && measurementAfterMouseUp === 0 && wallObjectsChanged(before, after)) {
+      return;
+    }
+  }
+
+  throw new Error(`${viewport.name}: smoke wall object drag did not move a wall object with transient measurements`);
+}
+
+function wallObjectsChanged(before, after) {
+  return before.some((beforeItem) => {
+    const afterItem = after.find((item) => item.id === beforeItem.id);
+    return afterItem && (
+      afterItem.wallId !== beforeItem.wallId ||
+      afterItem.u !== beforeItem.u ||
+      afterItem.y !== beforeItem.y
+    );
+  });
+}
+
+function assertWallObjectMoveCommandForSmoke(postedCommands, viewport) {
+  if (postedCommands.length === 0) {
+    return;
+  }
+
+  const wallObjectMove = postedCommands.find((command) => command?.type === 'MOVE_WALL_OBJECT');
+
+  if (!wallObjectMove) {
+    throw new Error(`${viewport.name}: wall object drag did not post MOVE_WALL_OBJECT`);
+  }
+
+  const payload = wallObjectMove.payload;
+  const validWallIds = new Set(['front', 'back', 'left', 'right']);
+
+  if (
+    typeof payload?.wallObjectId !== 'string' ||
+    !validWallIds.has(payload.wallId) ||
+    typeof payload.position?.u !== 'number' ||
+    typeof payload.position?.y !== 'number'
+  ) {
+    throw new Error(
+      `${viewport.name}: MOVE_WALL_OBJECT payload shape was invalid: ${JSON.stringify(wallObjectMove)}`,
+    );
+  }
 }
 
 function analyzePng(buffer) {

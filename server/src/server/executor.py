@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from server.commands import validate_command
 from server.events import create_state_event
-from server.room_rules import apply_transform_patch
+from server.room_rules import apply_transform_patch, apply_wall_object_position_patch
 from server.state import reset_layout_state
 from server.store import SQLiteStore
 
@@ -84,6 +84,13 @@ def apply_validated_command(state: JsonObject, command: JsonObject) -> JsonObjec
             {"position": command["payload"]["position"]},
         )
 
+    if command_type == "MOVE_WALL_OBJECT":
+        return apply_wall_object_position_command(
+            state,
+            command["payload"]["wallObjectId"],
+            command["payload"],
+        )
+
     if command_type == "REMOVE_FURNITURE":
         return apply_remove_furniture(state, command["payload"]["furnitureId"])
 
@@ -136,6 +143,18 @@ def apply_transform_command(state: JsonObject, furniture_id: str, patch: JsonObj
     next_state = deepcopy(state)
     next_state["revision"] = int(state["revision"]) + 1
     next_state["furniture"] = result["layout"]
+    return next_state
+
+
+def apply_wall_object_position_command(state: JsonObject, wall_object_id: str, patch: JsonObject) -> JsonObject:
+    result = apply_wall_object_position_patch(state["wallObjects"], state["room"], wall_object_id, patch)
+
+    if not result["applied"]:
+        raise CommandRejected("Command rejected: wall object not found")
+
+    next_state = deepcopy(state)
+    next_state["revision"] = int(state["revision"]) + 1
+    next_state["wallObjects"] = result["wallObjects"]
     return next_state
 
 

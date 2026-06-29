@@ -37,6 +37,26 @@ class CommandExecutorTests(unittest.TestCase):
 
             store.close()
 
+    def test_execute_wall_object_move_persists_patch_event_and_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            executor, store = self.create_executor(directory)
+
+            result = executor.execute_command(
+                {
+                    "type": "MOVE_WALL_OBJECT",
+                    "payload": {"wallObjectId": "window", "wallId": "left", "position": {"u": 0.5, "y": 1.4}},
+                }
+            )
+
+            self.assertTrue(result["accepted"])
+            self.assertEqual(result["revision"], 1)
+            self.assertEqual(result["events"][0]["type"], "room.state.patch")
+            self.assertEqual(set(result["events"][0]["patch"]["wallObjects"].keys()), {"window"})
+            self.assertEqual(store.load_state()["wallObjects"]["window"]["wallId"], "left")
+            self.assertEqual(store.load_state()["wallObjects"]["window"]["position"], {"u": 0.5, "y": 1.4})
+
+            store.close()
+
     def test_execute_reset_command_persists_snapshot_event(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             executor, store = self.create_executor(directory)
