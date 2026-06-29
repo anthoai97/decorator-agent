@@ -57,6 +57,13 @@ try {
     if (Number(committedXValue) !== -1) {
       throw new Error(`${viewport.name}: inspector X input did not commit negative value: ${committedXValue}`);
     }
+    await inspectorXInput.fill('');
+    await inspectorXInput.type(originalXValue);
+    await page.waitForTimeout(300);
+    const decimalXValue = await inspectorXInput.inputValue();
+    if (decimalXValue !== originalXValue) {
+      throw new Error(`${viewport.name}: inspector X input did not preserve decimal draft: ${decimalXValue}`);
+    }
     await inspectorXInput.fill(originalXValue);
     await page.waitForTimeout(300);
     const rotationBefore = await page.locator('#selected-position').textContent();

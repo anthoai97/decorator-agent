@@ -38,10 +38,13 @@ export function InspectorPanel() {
   const selected = useRoomStore((state) => (state.selectedId ? state.furniture[state.selectedId] : null));
   const setTransformFromInspector = useRoomStore((state) => state.setTransformFromInspector);
   const [drafts, setDrafts] = useState<InspectorDrafts>(emptyDrafts);
+  const [focusedField, setFocusedField] = useState<InspectorField | null>(null);
 
   useEffect(() => {
-    setDrafts(createDrafts(selected));
-  }, [selected, selectedId]);
+    if (!selected || focusedField === null) {
+      setDrafts(createDrafts(selected));
+    }
+  }, [focusedField, selected, selectedId]);
 
   function updateNumber(id: FurnitureId, field: InspectorField, event: ChangeEvent<HTMLInputElement>) {
     const draft = event.target.value;
@@ -58,15 +61,25 @@ export function InspectorPanel() {
       : setTransformFromInspector(id, { position: { [field]: value } });
     const nextItem = result.layout[id];
 
-    if (nextItem) {
+    if (nextItem && getFieldValue(nextItem, field) !== value) {
       setDrafts((current) => ({ ...current, [field]: String(getFieldValue(nextItem, field)) }));
     }
   }
 
   function resetInvalidDraft(field: InspectorField, event: FocusEvent<HTMLInputElement>) {
     const value = Number(event.target.value);
+    setFocusedField(null);
 
-    if (event.target.value.trim() !== '' && Number.isFinite(value)) {
+    if (event.target.value.trim() !== '' && Number.isFinite(value) && selectedId) {
+      const result = field === 'rotation'
+        ? setTransformFromInspector(selectedId, { rotation: { yDegrees: value } })
+        : setTransformFromInspector(selectedId, { position: { [field]: value } });
+      const nextItem = result.layout[selectedId];
+
+      setDrafts((current) => ({
+        ...current,
+        [field]: nextItem ? String(getFieldValue(nextItem, field)) : event.target.value,
+      }));
       return;
     }
 
@@ -92,6 +105,7 @@ export function InspectorPanel() {
                 type="text"
                 inputMode="decimal"
                 value={drafts.x}
+                onFocus={() => setFocusedField('x')}
                 onChange={(event) => updateNumber(selectedId, 'x', event)}
                 onBlur={(event) => resetInvalidDraft('x', event)}
               />
@@ -102,6 +116,7 @@ export function InspectorPanel() {
                 type="text"
                 inputMode="decimal"
                 value={drafts.z}
+                onFocus={() => setFocusedField('z')}
                 onChange={(event) => updateNumber(selectedId, 'z', event)}
                 onBlur={(event) => resetInvalidDraft('z', event)}
               />
@@ -112,6 +127,7 @@ export function InspectorPanel() {
                 type="text"
                 inputMode="numeric"
                 value={drafts.rotation}
+                onFocus={() => setFocusedField('rotation')}
                 onChange={(event) => updateNumber(selectedId, 'rotation', event)}
                 onBlur={(event) => resetInvalidDraft('rotation', event)}
               />
