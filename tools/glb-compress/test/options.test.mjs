@@ -92,4 +92,3 @@ test('validates missing paths and invalid ranges', () => {
   assert.throws(() => parseArgs(['source.glb', 'target.glb', '--error', '-1']), /error/i);
   assert.throws(() => parseArgs(['source.glb', 'target.glb', '--compress', 'zip']), /compress/i);
 });
-

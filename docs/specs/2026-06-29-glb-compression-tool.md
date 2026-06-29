@@ -56,4 +56,3 @@ The test suite does not download or execute `@gltf-transform/cli`; runtime compr
 - Default output uses simplification, vertex welding, `quantize` geometry compression, WebP texture compression, and a 1024px texture cap.
 - Users can override simplify ratio, error tolerance, compression method, texture method, and texture size.
 - Tests pass without network access.
-
