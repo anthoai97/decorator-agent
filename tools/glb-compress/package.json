@@ -1,0 +1,11 @@
+{
+  "name": "decorator-agent-glb-compress",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "compress": "node bin/compress-glb.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
+
