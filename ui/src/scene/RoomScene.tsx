@@ -3,6 +3,7 @@ import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
+import { sendServerCommand } from '../api/serverEvents';
 import { roomDefinition } from '../data/furnitureCatalog';
 import { useRoomStore } from '../state/useRoomStore';
 import { Bookshelf } from './components/Bookshelf';
@@ -12,12 +13,13 @@ import { LoungeChair } from './components/LoungeChair';
 import { Planter } from './components/Planter';
 import { RoomShell } from './components/RoomShell';
 import { Sofa } from './components/Sofa';
-import { useFurnitureDrag } from './interactions/useFurnitureDrag';
+import { useFurnitureDrag, type FurnitureMoveCommit } from './interactions/useFurnitureDrag';
 
 export function RoomScene() {
   const { camera } = useThree();
   const furniture = useRoomStore((state) => state.furniture);
   const selectFurniture = useRoomStore((state) => state.selectFurniture);
+  const showLayoutStatus = useRoomStore((state) => state.showLayoutStatus);
   const cameraMode = useRoomStore((state) => state.cameraMode);
   const setCameraMode = useRoomStore((state) => state.setCameraMode);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
@@ -28,9 +30,31 @@ export function RoomScene() {
     }
   }, []);
 
+  const commitFurnitureMove = useCallback(
+    (commit: FurnitureMoveCommit) => {
+      void (async () => {
+        try {
+          await sendServerCommand({
+            type: 'MOVE_FURNITURE',
+            payload: {
+              furnitureId: commit.id,
+              position: commit.position,
+            },
+          });
+          showLayoutStatus('Position saved to server');
+        } catch (error) {
+          showLayoutStatus(getMoveCommitErrorMessage(error));
+          console.warn(error);
+        }
+      })();
+    },
+    [showLayoutStatus],
+  );
+
   const drag = useFurnitureDrag({
     onDragStart: () => setControlsEnabled(false),
     onDragEnd: () => setControlsEnabled(true),
+    onDragCommit: commitFurnitureMove,
   });
 
   useEffect(() => {
@@ -55,21 +79,31 @@ export function RoomScene() {
       <directionalLight position={[-4, 3, -3]} color="#bfd7ff" intensity={0.8} />
       <RoomShell />
       <group onPointerMissed={() => selectFurniture(null)}>
-        <FurnitureItem item={furniture.sofa} drag={drag}>
-          <Sofa />
-        </FurnitureItem>
-        <FurnitureItem item={furniture['coffee-table']} drag={drag}>
-          <CoffeeTable />
-        </FurnitureItem>
-        <FurnitureItem item={furniture['lounge-chair']} drag={drag}>
-          <LoungeChair />
-        </FurnitureItem>
-        <FurnitureItem item={furniture.bookshelf} drag={drag}>
-          <Bookshelf />
-        </FurnitureItem>
-        <FurnitureItem item={furniture.planter} drag={drag}>
-          <Planter />
-        </FurnitureItem>
+        {furniture.sofa ? (
+          <FurnitureItem item={furniture.sofa} drag={drag}>
+            <Sofa />
+          </FurnitureItem>
+        ) : null}
+        {furniture['coffee-table'] ? (
+          <FurnitureItem item={furniture['coffee-table']} drag={drag}>
+            <CoffeeTable />
+          </FurnitureItem>
+        ) : null}
+        {furniture['lounge-chair'] ? (
+          <FurnitureItem item={furniture['lounge-chair']} drag={drag}>
+            <LoungeChair />
+          </FurnitureItem>
+        ) : null}
+        {furniture.bookshelf ? (
+          <FurnitureItem item={furniture.bookshelf} drag={drag}>
+            <Bookshelf />
+          </FurnitureItem>
+        ) : null}
+        {furniture.planter ? (
+          <FurnitureItem item={furniture.planter} drag={drag}>
+            <Planter />
+          </FurnitureItem>
+        ) : null}
       </group>
       <mesh
         position={[0, 0.01, 0]}
@@ -89,4 +123,18 @@ export function RoomScene() {
       />
     </>
   );
+}
+
+function getMoveCommitErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    if (error.message === 'Agent server URL is not configured') {
+      return 'Server bridge disabled; kept local position';
+    }
+
+    if (error.message.startsWith('Command rejected')) {
+      return error.message;
+    }
+  }
+
+  return 'Server unavailable; kept local position';
 }

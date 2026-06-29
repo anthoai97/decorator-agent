@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 
+import { startServerStateSync } from './api/serverSync';
 import { RoomCanvas } from './scene/RoomCanvas';
 import { useRoomStore } from './state/useRoomStore';
 import { PlaygroundShell } from './ui/PlaygroundShell';
@@ -32,10 +33,20 @@ function DebugHooks() {
   return null;
 }
 
+function ServerStateSync() {
+  useEffect(() => {
+    const sync = startServerStateSync();
+    return sync.stop;
+  }, []);
+
+  return null;
+}
+
 export function App() {
   return (
     <main id="app">
       <DebugHooks />
+      <ServerStateSync />
       <RoomCanvas />
       <PlaygroundShell />
     </main>

@@ -1,6 +1,7 @@
 import type { ChangeEvent } from 'react';
 import { useRef } from 'react';
 
+import { sendServerCommand, type ServerCommand } from '../api/serverEvents';
 import { useRoomStore } from '../state/useRoomStore';
 
 export function Toolbar() {
@@ -14,6 +15,45 @@ export function Toolbar() {
   const importLayout = useRoomStore((state) => state.importLayout);
   const showLayoutStatus = useRoomStore((state) => state.showLayoutStatus);
   const setCameraMode = useRoomStore((state) => state.setCameraMode);
+
+  async function notifyServer(command: ServerCommand) {
+    try {
+      await sendServerCommand(command);
+      showLayoutStatus(`Server accepted ${command.type}`);
+    } catch (error) {
+      showLayoutStatus(getToolbarCommandErrorMessage(error));
+      console.warn(error);
+    }
+  }
+
+  function rotateSelectedWithServer() {
+    if (!selectedId) {
+      return;
+    }
+
+    const result = rotateSelected();
+
+    if (!result?.applied) {
+      return;
+    }
+
+    void notifyServer({
+      type: 'SET_FURNITURE_ROTATION',
+      payload: {
+        furnitureId: selectedId,
+        rotationYDegrees: result.layout[selectedId].rotation.yDegrees,
+        position: {
+          x: result.layout[selectedId].position.x,
+          z: result.layout[selectedId].position.z,
+        },
+      },
+    });
+  }
+
+  function resetLayoutWithServer() {
+    resetLayout();
+    void notifyServer({ type: 'RESET_LAYOUT', payload: {} });
+  }
 
   function exportLayoutFile() {
     const layout = createLayoutExport();
@@ -61,7 +101,7 @@ export function Toolbar() {
         <span id="layout-status">{layoutStatus}</span>
       </div>
       <div className="actions">
-        <button id="rotate-object" type="button" disabled={!selectedId} onClick={rotateSelected}>
+        <button id="rotate-object" type="button" disabled={!selectedId} onClick={rotateSelectedWithServer}>
           Rotate
         </button>
         <button id="export-layout" type="button" onClick={exportLayoutFile}>
@@ -81,10 +121,24 @@ export function Toolbar() {
         <button id="top-view" type="button" onClick={() => setCameraMode('top')}>
           Top view
         </button>
-        <button id="reset-layout" type="button" onClick={resetLayout}>
+        <button id="reset-layout" type="button" onClick={resetLayoutWithServer}>
           Reset
         </button>
       </div>
     </section>
   );
+}
+
+function getToolbarCommandErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    if (error.message === 'Agent server URL is not configured') {
+      return 'Server bridge disabled; applied locally';
+    }
+
+    if (error.message.startsWith('Command rejected')) {
+      return error.message;
+    }
+  }
+
+  return 'Server unavailable; applied locally';
 }

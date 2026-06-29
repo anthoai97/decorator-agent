@@ -242,6 +242,13 @@ button:focus-visible {
   width: 100%;
 }
 
+.ai-stub__status {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 @media (max-width: 720px) {
   .hud {
     grid-template-columns: minmax(0, 1fr) max-content;

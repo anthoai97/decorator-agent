@@ -1,0 +1,42 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    command: uv run --frozen --python 3.13 python -m server --host 0.0.0.0 --port 8787
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./server:/app/server
+      - server-venv:/app/server/.venv
+      - server-data:/app/server/.data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=2).read()"
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  ui:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    command: npm run dev -- --host 0.0.0.0
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      VITE_AGENT_SERVER_URL: http://127.0.0.1:8787
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./ui:/app/ui
+      - ui-node-modules:/app/ui/node_modules
+
+volumes:
+  server-data:
+  server-venv:
+  ui-node-modules:

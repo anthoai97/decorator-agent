@@ -1,0 +1,12 @@
+.git
+.worktrees
+__pycache__
+*.py[cod]
+server/.data
+server/.venv
+server/src/server/__pycache__
+server/tests/__pycache__
+ui/dist
+ui/node_modules
+ui/.vite
+ui/smoke-*.png
