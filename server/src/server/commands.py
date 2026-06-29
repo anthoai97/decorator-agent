@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from server.state import FURNITURE_IDS
+from server.state import FURNITURE_IDS, ROOM_WALL_IDS, WALL_OBJECT_IDS
 
 JsonObject = dict[str, Any]
 
@@ -12,6 +12,7 @@ VALID_COMMAND_TYPES = {
     "ADD_OBJECTIVE",
     "DELETE_OBJECTIVE",
     "MOVE_FURNITURE",
+    "MOVE_WALL_OBJECT",
     "REMOVE_FURNITURE",
     "RESET_LAYOUT",
     "SET_FURNITURE_ROTATION",
@@ -60,6 +61,23 @@ def validate_command_payload(command_type: str, payload: JsonObject) -> JsonObje
         require_furniture_id(payload, command_type)
         position = require_position(payload, command_type)
         return {"furnitureId": payload["furnitureId"], "position": position}
+
+    if command_type == "MOVE_WALL_OBJECT":
+        require_one_exact_key_set(
+            payload,
+            (
+                {"wallObjectId", "position"},
+                {"wallObjectId", "wallId", "position"},
+            ),
+            command_type,
+        )
+        require_wall_object_id(payload, command_type)
+        position = require_wall_object_position(payload, command_type)
+        validated_payload = {"wallObjectId": payload["wallObjectId"], "position": position}
+        if "wallId" in payload:
+            require_wall_id(payload, command_type)
+            validated_payload["wallId"] = payload["wallId"]
+        return validated_payload
 
     if command_type == "REMOVE_FURNITURE":
         require_exact_keys(payload, {"furnitureId"}, command_type)
@@ -117,6 +135,18 @@ def require_furniture_id(payload: JsonObject, command_type: str) -> None:
         raise ValueError(f"{command_type} payload field furnitureId must be a known furniture id")
 
 
+def require_wall_object_id(payload: JsonObject, command_type: str) -> None:
+    value = payload.get("wallObjectId")
+    if value not in WALL_OBJECT_IDS:
+        raise ValueError(f"{command_type} payload field wallObjectId must be a known wall object id")
+
+
+def require_wall_id(payload: JsonObject, command_type: str) -> None:
+    value = payload.get("wallId")
+    if value not in ROOM_WALL_IDS:
+        raise ValueError(f"{command_type} payload field wallId must be a known room wall id")
+
+
 def require_position(payload: JsonObject, command_type: str) -> JsonObject:
     position = payload.get("position")
     if not isinstance(position, dict):
@@ -131,6 +161,22 @@ def require_position(payload: JsonObject, command_type: str) -> JsonObject:
     require_finite_number(position, "x", command_type, label="position.x")
     require_finite_number(position, "z", command_type, label="position.z")
     return {"x": position["x"], "z": position["z"]}
+
+
+def require_wall_object_position(payload: JsonObject, command_type: str) -> JsonObject:
+    position = payload.get("position")
+    if not isinstance(position, dict):
+        raise ValueError(f"{command_type} payload field position must be an object")
+
+    actual_keys = set(position.keys())
+    expected_keys = {"u", "y"}
+    if actual_keys != expected_keys:
+        expected = ", ".join(sorted(expected_keys))
+        raise ValueError(f"{command_type} payload field position must include exactly: {expected}")
+
+    require_finite_number(position, "u", command_type, label="position.u")
+    require_finite_number(position, "y", command_type, label="position.y")
+    return {"u": position["u"], "y": position["y"]}
 
 
 def require_finite_number(payload: JsonObject, key: str, command_type: str, label: str | None = None) -> None:

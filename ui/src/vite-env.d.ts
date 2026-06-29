@@ -15,6 +15,19 @@ declare global {
         z: number;
         rotation: number;
       }>;
+      wallObjects: () => Array<{
+        id: string;
+        name: string;
+        wallId: string;
+        u: number;
+        y: number;
+      }>;
+      wallObjectScreenTargets?: () => Array<{
+        id: string;
+        name: string;
+        x: number;
+        y: number;
+      }>;
     };
   }
 }

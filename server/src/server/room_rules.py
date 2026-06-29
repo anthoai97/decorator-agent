@@ -7,7 +7,7 @@ from server.state import snap_degrees
 
 JsonObject = dict[str, Any]
 
-ROOM_PADDING = 0.18
+ROOM_PADDING = 0
 COLLISION_PADDING = 0.04
 
 
@@ -106,6 +106,48 @@ def clamp_transform_inside_room(item: JsonObject, room: JsonObject) -> JsonObjec
     return next_item
 
 
+def wall_object_bounds(room: JsonObject, wall_id: str) -> JsonObject:
+    if wall_id in {"front", "back"}:
+        min_u = room["bounds"]["minX"]
+        max_u = room["bounds"]["maxX"]
+    else:
+        min_u = room["bounds"]["minZ"]
+        max_u = room["bounds"]["maxZ"]
+
+    return {
+        "minU": min_u,
+        "maxU": max_u,
+        "minY": 0,
+        "maxY": room["height"],
+    }
+
+
+def clamp_wall_object_inside_wall(item: JsonObject, room: JsonObject) -> JsonObject:
+    bounds = wall_object_bounds(room, item["wallId"])
+    half_width = item["size"]["width"] / 2
+    half_height = item["size"]["height"] / 2
+
+    next_item = deepcopy(item)
+    next_item["position"] = {
+        "u": round_footprint(clamp(next_item["position"]["u"], bounds["minU"] + half_width, bounds["maxU"] - half_width)),
+        "y": round_footprint(clamp(next_item["position"]["y"], bounds["minY"] + half_height, bounds["maxY"] - half_height)),
+    }
+    return next_item
+
+
+def wall_object_edge_distances(item: JsonObject, room: JsonObject) -> JsonObject:
+    bounds = wall_object_bounds(room, item["wallId"])
+    half_width = item["size"]["width"] / 2
+    half_height = item["size"]["height"] / 2
+
+    return {
+        "left": round_footprint(item["position"]["u"] - half_width - bounds["minU"]),
+        "right": round_footprint(bounds["maxU"] - item["position"]["u"] - half_width),
+        "bottom": round_footprint(item["position"]["y"] - half_height - bounds["minY"]),
+        "top": round_footprint(bounds["maxY"] - item["position"]["y"] - half_height),
+    }
+
+
 def apply_transform_patch(layout: JsonObject, room: JsonObject, furniture_id: str, patch: JsonObject) -> JsonObject:
     if furniture_id not in layout:
         return {
@@ -152,4 +194,51 @@ def apply_transform_patch(layout: JsonObject, room: JsonObject, furniture_id: st
         "clamped": clamped,
         "reason": "applied",
         "layout": next_layout,
+    }
+
+
+def apply_wall_object_position_patch(
+    layout: JsonObject,
+    room: JsonObject,
+    wall_object_id: str,
+    patch: JsonObject,
+) -> JsonObject:
+    if wall_object_id not in layout:
+        return {
+            "applied": False,
+            "clamped": False,
+            "reason": "missing-wall-object",
+            "wallObjects": layout,
+        }
+
+    next_layout = clone_layout(layout)
+    previous_item = next_layout[wall_object_id]
+    if "position" in patch or "wallId" in patch:
+        position_patch = patch.get("position") or {}
+        wall_id = patch.get("wallId", previous_item["wallId"])
+    else:
+        position_patch = patch
+        wall_id = previous_item["wallId"]
+    next_item = {
+        **previous_item,
+        "wallId": wall_id,
+        "position": {
+            **previous_item["position"],
+            **position_patch,
+        },
+    }
+
+    clamped_item = clamp_wall_object_inside_wall(next_item, room)
+    clamped = (
+        clamped_item["position"]["u"] != next_item["position"]["u"]
+        or clamped_item["position"]["y"] != next_item["position"]["y"]
+    )
+
+    next_layout[wall_object_id] = clamped_item
+
+    return {
+        "applied": True,
+        "clamped": clamped,
+        "reason": "applied",
+        "wallObjects": next_layout,
     }

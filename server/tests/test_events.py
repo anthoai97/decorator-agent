@@ -31,6 +31,27 @@ class StateEventTests(unittest.TestCase):
         self.assertEqual(set(event["patch"]["furniture"].keys()), {"coffee-table"})
         self.assertEqual(event["patch"]["furniture"]["coffee-table"]["position"]["x"], 1.2)
 
+    def test_wall_object_move_command_emits_patch_for_only_changed_wall_object(self) -> None:
+        state = create_initial_state()
+        state["revision"] = 2
+        state["wallObjects"]["window"]["wallId"] = "left"
+        state["wallObjects"]["window"]["position"] = {"u": 0.5, "y": 1.4}
+        command = validate_command(
+            {
+                "type": "MOVE_WALL_OBJECT",
+                "payload": {"wallObjectId": "window", "wallId": "left", "position": {"u": 0.5, "y": 1.4}},
+            }
+        )
+
+        event = create_state_event(command, state)
+
+        self.assertEqual(event["type"], "room.state.patch")
+        self.assertEqual(event["revision"], 2)
+        self.assertEqual(set(event["patch"].keys()), {"wallObjects"})
+        self.assertEqual(set(event["patch"]["wallObjects"].keys()), {"window"})
+        self.assertEqual(event["patch"]["wallObjects"]["window"]["wallId"], "left")
+        self.assertEqual(event["patch"]["wallObjects"]["window"]["position"], {"u": 0.5, "y": 1.4})
+
     def test_rotation_command_emits_idempotent_furniture_replacement(self) -> None:
         state = create_initial_state()
         state["revision"] = 3

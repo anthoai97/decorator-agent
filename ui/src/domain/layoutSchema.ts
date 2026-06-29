@@ -6,6 +6,10 @@ import {
   rotationAwareSize,
 } from './collision';
 import { round, snapDegrees } from './math';
+import {
+  clampWallObjectInsideWall,
+  cloneWallObjectLayout,
+} from './wallObjectPlacement';
 import type {
   Footprint,
   FurnitureId,
@@ -15,10 +19,16 @@ import type {
   LayoutExportItem,
   RoomBounds,
   RoomDefinition,
+  RoomWallId,
   RoomLayoutExport,
   Size3Data,
   TransformPatch,
   Vector3Data,
+  WallObjectId,
+  WallObjectLayoutItem,
+  WallObjectLayoutMap,
+  WallObjectLayoutExportItem,
+  WallObjectPosition,
 } from './types';
 
 interface ImportMatch {
@@ -26,9 +36,16 @@ interface ImportMatch {
   patch: TransformPatch;
 }
 
+interface WallObjectImportMatch {
+  id: WallObjectId;
+  position: Partial<WallObjectPosition>;
+  wallId?: RoomWallId;
+}
+
 export function createLayoutExport(
   layout: FurnitureLayoutMap,
   room: RoomDefinition,
+  wallObjects?: WallObjectLayoutMap,
 ): RoomLayoutExport {
   return {
     schemaVersion: 1,
@@ -52,6 +69,7 @@ export function createLayoutExport(
       bounds: roundRoomBounds(room.bounds),
     },
     furniture: Object.values(layout).map(createExportItem),
+    ...(wallObjects ? { wallObjects: Object.values(wallObjects).map(createWallObjectExportItem) } : {}),
   };
 }
 
@@ -59,10 +77,12 @@ export function importLayoutFromUnknown(
   source: unknown,
   currentLayout: FurnitureLayoutMap,
   room: RoomDefinition,
+  currentWallObjects?: WallObjectLayoutMap,
 ): ImportResult {
   const items = normalizeLayoutItems(source);
+  const wallObjectItems = normalizeWallObjectLayoutItems(source);
 
-  if (items.length === 0) {
+  if (items.length === 0 && wallObjectItems.length === 0) {
     throw new Error('Layout JSON does not contain a furniture array.');
   }
 
@@ -75,8 +95,23 @@ export function importLayoutFromUnknown(
 
     return matchedItems;
   }, []);
+  const wallObjectMatches = currentWallObjects
+    ? wallObjectItems.reduce<WallObjectImportMatch[]>((matchedItems, item) => {
+        const id = findWallObjectId(item, currentWallObjects);
 
-  if (matches.length === 0) {
+        if (id) {
+          const patch = readWallObjectImportPatch(item);
+
+          if (patch) {
+            matchedItems.push({ id, ...patch });
+          }
+        }
+
+        return matchedItems;
+      }, [])
+    : [];
+
+  if (matches.length === 0 && wallObjectMatches.length === 0) {
     throw new Error('Layout JSON did not match any furniture IDs or names.');
   }
 
@@ -86,7 +121,15 @@ export function importLayoutFromUnknown(
     throw new Error('Imported layout has overlapping furniture.');
   }
 
-  return { applied: matches.length, layout };
+  const wallObjects = currentWallObjects
+    ? applyWallObjectImport(wallObjectMatches, currentWallObjects, room)
+    : undefined;
+
+  return {
+    applied: matches.length + wallObjectMatches.length,
+    layout,
+    ...(wallObjects ? { wallObjects } : {}),
+  };
 }
 
 function applyImport(
@@ -135,6 +178,20 @@ function createExportItem(item: FurnitureLayoutItem): LayoutExportItem {
   };
 }
 
+function createWallObjectExportItem(item: WallObjectLayoutItem): WallObjectLayoutExportItem {
+  return {
+    id: item.id,
+    name: item.name,
+    wallId: item.wallId,
+    movable: item.movable,
+    position: {
+      u: round(item.position.u),
+      y: round(item.position.y),
+    },
+    size: roundSize(item.size),
+  };
+}
+
 function normalizeLayoutItems(source: unknown): Record<string, unknown>[] {
   if (Array.isArray(source)) {
     return source.filter(isRecord);
@@ -153,6 +210,14 @@ function normalizeLayoutItems(source: unknown): Record<string, unknown>[] {
   }
 
   return [];
+}
+
+function normalizeWallObjectLayoutItems(source: unknown): Record<string, unknown>[] {
+  if (!isRecord(source)) {
+    return [];
+  }
+
+  return Array.isArray(source.wallObjects) ? source.wallObjects.filter(isRecord) : [];
 }
 
 function findFurnitureId(
@@ -190,6 +255,67 @@ function findCandidateFurnitureId(
   );
 }
 
+function findWallObjectId(
+  item: Record<string, unknown>,
+  layout: WallObjectLayoutMap,
+): WallObjectId | null {
+  const candidates = [item.id, item.layoutId, item.name, item.label];
+
+  for (const candidate of candidates) {
+    const id = findCandidateWallObjectId(candidate, layout);
+
+    if (id) {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+function findCandidateWallObjectId(
+  candidate: unknown,
+  layout: WallObjectLayoutMap,
+): WallObjectId | null {
+  const token = normalizeToken(candidate);
+
+  if (token.length === 0) {
+    return null;
+  }
+
+  return (
+    Object.values(layout).find((wallObject) => (
+      normalizeToken(wallObject.id) === token ||
+      normalizeToken(wallObject.name) === token
+    ))?.id ?? null
+  );
+}
+
+function applyWallObjectImport(
+  matches: WallObjectImportMatch[],
+  currentWallObjects: WallObjectLayoutMap,
+  room: RoomDefinition,
+): WallObjectLayoutMap {
+  const nextWallObjects = cloneWallObjectLayout(currentWallObjects);
+
+  for (const match of matches) {
+    const item = nextWallObjects[match.id];
+
+    nextWallObjects[match.id] = clampWallObjectInsideWall(
+      {
+        ...item,
+        wallId: match.wallId ?? item.wallId,
+        position: {
+          ...item.position,
+          ...match.position,
+        },
+      },
+      room,
+    );
+  }
+
+  return nextWallObjects;
+}
+
 function readTransformPatch(item: Record<string, unknown>): TransformPatch {
   const patch: TransformPatch = {};
   const position = readRecord(item.position) ?? readRecord(item.translation);
@@ -206,6 +332,31 @@ function readTransformPatch(item: Record<string, unknown>): TransformPatch {
   }
 
   return patch;
+}
+
+function readWallObjectImportPatch(
+  item: Record<string, unknown>,
+): Pick<WallObjectImportMatch, 'position' | 'wallId'> | undefined {
+  const position = readRecord(item.position) ?? readRecord(item.translation);
+  const wallId = readRoomWallId(item.wallId);
+  const patch: Pick<WallObjectImportMatch, 'position' | 'wallId'> = { position: {} };
+
+  const u = position ? readNumber(position.u) : undefined;
+  const y = position ? readNumber(position.y) : undefined;
+
+  if (u !== undefined) {
+    patch.position.u = u;
+  }
+
+  if (y !== undefined) {
+    patch.position.y = y;
+  }
+
+  if (wallId) {
+    patch.wallId = wallId;
+  }
+
+  return Object.keys(patch.position).length > 0 || patch.wallId ? patch : undefined;
 }
 
 function readPositionPatch(position: Record<string, unknown>): Partial<Vector3Data> | undefined {
@@ -295,6 +446,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function normalizeToken(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function readRoomWallId(value: unknown): RoomWallId | undefined {
+  const token = normalizeToken(value);
+
+  if (token === 'front' || token === 'back' || token === 'left' || token === 'right') {
+    return token;
+  }
+
+  return undefined;
 }
 
 function readNumber(value: unknown): number | undefined {

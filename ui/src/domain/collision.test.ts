@@ -92,15 +92,41 @@ describe('collision helpers', () => {
 
     const size = rotationAwareSize(clamped.baseSize, clamped.rotation.yDegrees);
     const footprint = createFootprint(clamped.position, size);
-    const minX = Number((roomDefinition.bounds.minX + 0.18).toFixed(3));
-    const maxX = Number((roomDefinition.bounds.maxX - 0.18).toFixed(3));
-    const minZ = Number((roomDefinition.bounds.minZ + 0.18).toFixed(3));
-    const maxZ = Number((roomDefinition.bounds.maxZ - 0.18).toFixed(3));
+    const minX = Number(roomDefinition.bounds.minX.toFixed(3));
+    const maxX = Number(roomDefinition.bounds.maxX.toFixed(3));
+    const minZ = Number(roomDefinition.bounds.minZ.toFixed(3));
+    const maxZ = Number(roomDefinition.bounds.maxZ.toFixed(3));
 
     expect(footprint.minX).toBeGreaterThanOrEqual(minX);
     expect(footprint.maxX).toBeLessThanOrEqual(maxX);
     expect(footprint.minZ).toBeGreaterThanOrEqual(minZ);
     expect(footprint.maxZ).toBeLessThanOrEqual(maxZ);
+  });
+
+  it('clamps furniture footprints flush to room walls without hidden padding', () => {
+    const sofa = createInitialFurnitureLayout().sofa;
+    const clampedToMin = clampTransformInsideRoom(
+      {
+        ...sofa,
+        position: { x: -99, y: 0, z: -99 },
+      },
+      roomDefinition,
+    );
+    const clampedToMax = clampTransformInsideRoom(
+      {
+        ...sofa,
+        position: { x: 99, y: 0, z: 99 },
+      },
+      roomDefinition,
+    );
+    const size = rotationAwareSize(sofa.baseSize, sofa.rotation.yDegrees);
+    const minFootprint = createFootprint(clampedToMin.position, size);
+    const maxFootprint = createFootprint(clampedToMax.position, size);
+
+    expect(minFootprint.minX).toBe(roomDefinition.bounds.minX);
+    expect(minFootprint.minZ).toBe(roomDefinition.bounds.minZ);
+    expect(maxFootprint.maxX).toBe(roomDefinition.bounds.maxX);
+    expect(maxFootprint.maxZ).toBe(roomDefinition.bounds.maxZ);
   });
 
   it('clamps furniture height inside room bounds', () => {
@@ -137,8 +163,8 @@ describe('collision helpers', () => {
     const footprint = createFootprint(clamped.position, size);
 
     expect(clamped.position.y).toBe(0);
-    expect(footprint.minX).toBeGreaterThanOrEqual(-2.72);
-    expect(footprint.maxZ).toBeLessThanOrEqual(2.02);
+    expect(footprint.minX).toBeGreaterThanOrEqual(-2.9);
+    expect(footprint.maxZ).toBeLessThanOrEqual(2.2);
   });
 
   it('detects overlapping furniture', () => {

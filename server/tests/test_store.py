@@ -64,6 +64,28 @@ class SQLiteStoreTests(unittest.TestCase):
 
             second_store.close()
 
+    def test_load_state_preserves_reconciled_wall_object_wall_id(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SQLiteStore(Path(directory) / "state.sqlite3")
+            command = validate_command(
+                {
+                    "type": "MOVE_WALL_OBJECT",
+                    "payload": {"wallObjectId": "window", "wallId": "left", "position": {"u": 0.5, "y": 1.4}},
+                }
+            )
+            state = create_initial_state()
+            state["revision"] = 1
+            state["wallObjects"]["window"]["wallId"] = "left"
+            state["wallObjects"]["window"]["position"] = {"u": 0.5, "y": 1.4}
+            store.record_accepted_command(command, [create_state_event(command, state)], state)
+
+            loaded_state = store.load_state()
+
+            self.assertEqual(loaded_state["wallObjects"]["window"]["wallId"], "left")
+            self.assertEqual(loaded_state["wallObjects"]["window"]["position"], {"u": 0.5, "y": 1.4})
+
+            store.close()
+
     def test_load_state_reconciles_legacy_state_with_catalog_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = SQLiteStore(Path(directory) / "state.sqlite3")
@@ -71,6 +93,7 @@ class SQLiteStoreTests(unittest.TestCase):
             legacy_state = create_initial_state()
             legacy_state["revision"] = 1
             legacy_state["furniture"]["coffee-table"]["position"]["x"] = -2.762
+            del legacy_state["wallObjects"]
             del legacy_state["furniture"]["rug"]
             del legacy_state["furniture"]["sofa"]["blocksPlacement"]
             store.record_accepted_command(command, [create_state_event(command, legacy_state)], legacy_state)
@@ -81,6 +104,7 @@ class SQLiteStoreTests(unittest.TestCase):
             self.assertFalse(loaded_state["furniture"]["rug"]["blocksPlacement"])
             self.assertTrue(loaded_state["furniture"]["sofa"]["blocksPlacement"])
             self.assertEqual(loaded_state["furniture"]["coffee-table"]["position"]["x"], -2.762)
+            self.assertEqual(loaded_state["wallObjects"]["window"]["position"], {"u": -2.1, "y": 1.7})
 
             store.close()
 
@@ -107,6 +131,7 @@ class SQLiteStoreTests(unittest.TestCase):
             self.assertEqual(loaded_state["objectives"], state["objectives"])
             self.assertEqual(loaded_state["room"], create_initial_state()["room"])
             self.assertEqual(loaded_state["furniture"], create_initial_state()["furniture"])
+            self.assertEqual(loaded_state["wallObjects"], create_initial_state()["wallObjects"])
 
             store.close()
 

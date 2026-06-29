@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from server.state import FURNITURE_IDS, create_initial_state, reset_layout_state
+from server.state import FURNITURE_IDS, WALL_OBJECT_IDS, create_initial_state, reset_layout_state
 
 
 class StateModelTests(unittest.TestCase):
@@ -24,6 +24,7 @@ class StateModelTests(unittest.TestCase):
             },
         )
         self.assertEqual(set(state["furniture"].keys()), FURNITURE_IDS)
+        self.assertEqual(set(state["wallObjects"].keys()), WALL_OBJECT_IDS)
         self.assertEqual(state["objectives"], [])
 
     def test_initial_furniture_items_include_render_fields(self) -> None:
@@ -45,6 +46,14 @@ class StateModelTests(unittest.TestCase):
         self.assertEqual(rug["position"], {"x": -0.55, "y": 0, "z": -0.25})
         self.assertEqual(rug["baseSize"], {"width": 2.7, "height": 0.025, "depth": 1.75})
 
+    def test_initial_state_includes_wall_objects(self) -> None:
+        wall_objects = create_initial_state()["wallObjects"]
+
+        self.assertEqual(wall_objects["window"]["wallId"], "back")
+        self.assertEqual(wall_objects["window"]["position"], {"u": -2.1, "y": 1.7})
+        self.assertTrue(wall_objects["window"]["movable"])
+        self.assertEqual(wall_objects["wall-art"]["position"], {"u": 1.85, "y": 1.55})
+
     def test_initial_state_returns_independent_copies(self) -> None:
         first = create_initial_state()
         second = create_initial_state()
@@ -58,11 +67,13 @@ class StateModelTests(unittest.TestCase):
         state["revision"] = 4
         state["objectives"] = [{"id": "objective-1", "title": "Keep a reading corner"}]
         state["furniture"]["sofa"]["position"]["x"] = 99
+        state["wallObjects"]["window"]["position"]["u"] = 0.5
 
         reset_state = reset_layout_state(state)
 
         self.assertEqual(reset_state["revision"], 5)
         self.assertEqual(reset_state["furniture"]["sofa"]["position"]["x"], -0.9)
+        self.assertEqual(reset_state["wallObjects"]["window"]["position"], {"u": -2.1, "y": 1.7})
         self.assertEqual(reset_state["objectives"], state["objectives"])
         self.assertEqual(state["furniture"]["sofa"]["position"]["x"], 99)
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -8,13 +8,16 @@ import { roomDefinition } from '../data/furnitureCatalog';
 import { useRoomStore } from '../state/useRoomStore';
 import { Bookshelf } from './components/Bookshelf';
 import { CoffeeTable } from './components/CoffeeTable';
+import { DragMeasurements } from './components/DragMeasurements';
 import { FurnitureItem } from './components/FurnitureItem';
 import { LoungeChair } from './components/LoungeChair';
 import { Planter } from './components/Planter';
 import { RoomShell } from './components/RoomShell';
 import { Rug } from './components/Rug';
 import { Sofa } from './components/Sofa';
+import { WallObjectsLayer } from './components/WallObjectsLayer';
 import { useFurnitureDrag, type FurnitureMoveCommit } from './interactions/useFurnitureDrag';
+import { useWallObjectDrag, type WallObjectMoveCommit } from './interactions/useWallObjectDrag';
 import {
   CAMERA_MAX_DISTANCE,
   CAMERA_MIN_DISTANCE,
@@ -24,6 +27,9 @@ import {
   type OpenWallIds,
   TOP_VIEW_CAMERA_POSITION,
 } from './roomView';
+import type { RoomWallId } from '../domain/types';
+
+const allWallIds: RoomWallId[] = ['front', 'back', 'left', 'right'];
 
 export function RoomScene() {
   const { camera } = useThree();
@@ -40,6 +46,10 @@ export function RoomScene() {
   const cameraMode = useRoomStore((state) => state.cameraMode);
   const setCameraMode = useRoomStore((state) => state.setCameraMode);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const targetWallIds = useMemo(
+    () => allWallIds.filter((wallId) => !openWallIds.includes(wallId)),
+    [openWallIds],
+  );
 
   const setControlsEnabled = useCallback((enabled: boolean) => {
     if (controlsRef.current) {
@@ -68,10 +78,38 @@ export function RoomScene() {
     [showLayoutStatus],
   );
 
+  const commitWallObjectMove = useCallback(
+    (commit: WallObjectMoveCommit) => {
+      void (async () => {
+        try {
+          await sendServerCommand({
+            type: 'MOVE_WALL_OBJECT',
+            payload: {
+              wallObjectId: commit.id,
+              wallId: commit.wallId,
+              position: commit.position,
+            },
+          });
+          showLayoutStatus('Position saved to server');
+        } catch (error) {
+          showLayoutStatus(getMoveCommitErrorMessage(error));
+          console.warn(error);
+        }
+      })();
+    },
+    [showLayoutStatus],
+  );
+
   const drag = useFurnitureDrag({
     onDragStart: () => setControlsEnabled(false),
     onDragEnd: () => setControlsEnabled(true),
     onDragCommit: commitFurnitureMove,
+  });
+  const wallObjectDrag = useWallObjectDrag({
+    targetWallIds,
+    onDragStart: () => setControlsEnabled(false),
+    onDragEnd: () => setControlsEnabled(true),
+    onDragCommit: commitWallObjectMove,
   });
 
   useEffect(() => {
@@ -113,6 +151,8 @@ export function RoomScene() {
       <directionalLight position={[2.4, 5.2, 2.8]} intensity={2.4} />
       <directionalLight position={[-4, 3, -3]} color="#bfd7ff" intensity={0.8} />
       <RoomShell openWallIds={openWallIds} />
+      <WallObjectsLayer openWallIds={openWallIds} drag={wallObjectDrag} />
+      <DragMeasurements />
       <group onPointerMissed={() => selectFurniture(null)}>
         {furniture.sofa ? (
           <FurnitureItem item={furniture.sofa} drag={drag}>

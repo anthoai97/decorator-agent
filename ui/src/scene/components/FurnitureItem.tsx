@@ -6,7 +6,6 @@ import { radiansFromDegrees } from '../../domain/math';
 import type { FurnitureLayoutItem } from '../../domain/types';
 import { useRoomStore } from '../../state/useRoomStore';
 import type { FurnitureDragApi } from '../interactions/useFurnitureDrag';
-import { SelectionBounds } from './SelectionBounds';
 
 interface FurnitureItemProps {
   item: FurnitureLayoutItem;
@@ -27,11 +26,7 @@ function getPointerCaptureTarget(event: FurniturePointerEvent): PointerCaptureTa
 }
 
 export function FurnitureItem({ item, drag, children }: FurnitureItemProps) {
-  const selectedId = useRoomStore((state) => state.selectedId);
-  const hoveredId = useRoomStore((state) => state.hoveredId);
   const selectFurniture = useRoomStore((state) => state.selectFurniture);
-  const hoverFurniture = useRoomStore((state) => state.hoverFurniture);
-  const isEmphasized = selectedId === item.id || hoveredId === item.id;
 
   function handlePointerDown(event: FurniturePointerEvent) {
     if (event.button !== 0) {
@@ -75,16 +70,6 @@ export function FurnitureItem({ item, drag, children }: FurnitureItemProps) {
     drag.endDrag();
   }
 
-  function handlePointerOver(event: FurniturePointerEvent) {
-    event.stopPropagation();
-    hoverFurniture(item.id);
-  }
-
-  function handlePointerOut(event: FurniturePointerEvent) {
-    event.stopPropagation();
-    hoverFurniture(null);
-  }
-
   return (
     <group
       name={item.name}
@@ -96,11 +81,8 @@ export function FurnitureItem({ item, drag, children }: FurnitureItemProps) {
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
       onLostPointerCapture={handleLostPointerCapture}
-      onPointerOver={handlePointerOver}
-      onPointerOut={handlePointerOut}
     >
       {children}
-      {isEmphasized ? <SelectionBounds baseSize={item.baseSize} /> : null}
     </group>
   );
 }

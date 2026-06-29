@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
-from server.state import create_initial_state
+from server.state import ROOM_WALL_IDS, create_initial_state
 
 JsonObject = dict[str, Any]
 
@@ -286,6 +286,7 @@ def reconcile_state_with_catalog(state: JsonObject, removed_furniture_ids: set[s
             "revision": revision,
             "room": deepcopy(initial_state["room"]),
             "furniture": deepcopy(initial_state["furniture"]),
+            "wallObjects": deepcopy(initial_state["wallObjects"]),
             "objectives": objectives,
         }
 
@@ -297,6 +298,10 @@ def reconcile_state_with_catalog(state: JsonObject, removed_furniture_ids: set[s
             initial_state["furniture"],
             state.get("furniture"),
             removed_furniture_ids,
+        ),
+        "wallObjects": reconcile_wall_object_layout(
+            initial_state["wallObjects"],
+            state.get("wallObjects"),
         ),
         "objectives": objectives,
     }
@@ -349,6 +354,38 @@ def reconcile_furniture_item(default_item: JsonObject, stored_item: JsonObject) 
     reconciled_item = deepcopy(default_item)
     reconciled_item["position"] = merge_object(default_item["position"], stored_item.get("position"))
     reconciled_item["rotation"] = merge_object(default_item["rotation"], stored_item.get("rotation"))
+    return reconciled_item
+
+
+def reconcile_wall_object_layout(default_wall_objects: JsonObject, stored_wall_objects: Any) -> JsonObject:
+    if not isinstance(stored_wall_objects, dict):
+        stored_wall_objects = {}
+
+    reconciled_wall_objects: JsonObject = {}
+
+    for wall_object_id, default_item in default_wall_objects.items():
+        stored_item = stored_wall_objects.get(wall_object_id)
+
+        if isinstance(stored_item, dict):
+            reconciled_wall_objects[wall_object_id] = reconcile_wall_object_item(default_item, stored_item)
+        else:
+            reconciled_wall_objects[wall_object_id] = deepcopy(default_item)
+
+    for wall_object_id, stored_item in stored_wall_objects.items():
+        if wall_object_id not in reconciled_wall_objects and wall_object_id not in default_wall_objects:
+            reconciled_wall_objects[wall_object_id] = deepcopy(stored_item)
+
+    return reconciled_wall_objects
+
+
+def reconcile_wall_object_item(default_item: JsonObject, stored_item: JsonObject) -> JsonObject:
+    reconciled_item = deepcopy(default_item)
+    wall_id = stored_item.get("wallId")
+
+    if wall_id in ROOM_WALL_IDS:
+        reconciled_item["wallId"] = wall_id
+
+    reconciled_item["position"] = merge_object(default_item["position"], stored_item.get("position"))
     return reconciled_item
 
 

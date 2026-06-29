@@ -1,8 +1,7 @@
-import type { RoomDefinition } from '../domain/types';
+import type { RoomDefinition, RoomWallId } from '../domain/types';
 
 export type Vector3Tuple = [number, number, number];
 
-export type RoomWallId = 'front' | 'back' | 'left' | 'right';
 export type OpenWallIds = [RoomWallId, RoomWallId];
 
 type HorizontalPoint = {

@@ -62,6 +62,20 @@ class CommandValidationTests(unittest.TestCase):
         self.assertEqual(command["type"], "MOVE_FURNITURE")
         self.assertEqual(command["payload"]["position"], {"x": 1.2, "z": 1.6})
 
+    def test_validates_wall_object_move_command(self) -> None:
+        command = validate_command(
+            {
+                "source": "agent",
+                "type": "MOVE_WALL_OBJECT",
+                "payload": {"wallObjectId": "window", "wallId": "left", "position": {"u": 0.5, "y": 1.4}},
+            }
+        )
+
+        self.assertEqual(command["source"], "agent")
+        self.assertEqual(command["type"], "MOVE_WALL_OBJECT")
+        self.assertEqual(command["payload"]["wallId"], "left")
+        self.assertEqual(command["payload"]["position"], {"u": 0.5, "y": 1.4})
+
     def test_validates_objective_commands(self) -> None:
         add_command = validate_command({"type": "ADD_OBJECTIVE", "payload": {"title": "Make space for reading"}})
         delete_command = validate_command({"type": "DELETE_OBJECTIVE", "payload": {"objectiveId": "objective-1"}})
@@ -100,6 +114,30 @@ class CommandValidationTests(unittest.TestCase):
                 }
             )
 
+    def test_rejects_unknown_wall_object_id(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "MOVE_WALL_OBJECT payload field wallObjectId must be a known wall object id",
+        ):
+            validate_command(
+                {
+                    "type": "MOVE_WALL_OBJECT",
+                    "payload": {"wallObjectId": "mirror", "position": {"u": 1, "y": 1}},
+                }
+            )
+
+    def test_rejects_unknown_wall_id(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "MOVE_WALL_OBJECT payload field wallId must be a known room wall id",
+        ):
+            validate_command(
+                {
+                    "type": "MOVE_WALL_OBJECT",
+                    "payload": {"wallObjectId": "window", "wallId": "ceiling", "position": {"u": 1, "y": 1}},
+                }
+            )
+
     def test_rejects_non_finite_numbers(self) -> None:
         with self.assertRaisesRegex(ValueError, "SET_FURNITURE_ROTATION payload field rotationYDegrees must be a finite number"):
             validate_command(
@@ -117,6 +155,14 @@ class CommandValidationTests(unittest.TestCase):
                 }
             )
 
+        with self.assertRaisesRegex(ValueError, "MOVE_WALL_OBJECT payload field position.u must be a finite number"):
+            validate_command(
+                {
+                    "type": "MOVE_WALL_OBJECT",
+                    "payload": {"wallObjectId": "window", "position": {"u": True, "y": 1}},
+                }
+            )
+
     def test_rejects_invalid_position_shape(self) -> None:
         with self.assertRaisesRegex(ValueError, "MOVE_FURNITURE payload field position must be an object"):
             validate_command({"type": "MOVE_FURNITURE", "payload": {"furnitureId": "sofa", "position": None}})
@@ -126,6 +172,14 @@ class CommandValidationTests(unittest.TestCase):
                 {
                     "type": "MOVE_FURNITURE",
                     "payload": {"furnitureId": "sofa", "position": {"x": 0, "y": 0, "z": 0}},
+                }
+            )
+
+        with self.assertRaisesRegex(ValueError, "MOVE_WALL_OBJECT payload field position must include exactly: u, y"):
+            validate_command(
+                {
+                    "type": "MOVE_WALL_OBJECT",
+                    "payload": {"wallObjectId": "window", "position": {"u": 0, "x": 0, "y": 1}},
                 }
             )
 
