@@ -8,6 +8,7 @@ const browserPath =
   [
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   ].find((path) => existsSync(path));
 const viewports = [
   { name: 'desktop', width: 1440, height: 920 },
