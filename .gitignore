@@ -3,3 +3,4 @@ dist
 .vite
 smoke-*.png
 .worktrees
+.DS_Store

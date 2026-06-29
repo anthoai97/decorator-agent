@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -156,7 +156,9 @@ export function RoomScene() {
       <group onPointerMissed={() => selectFurniture(null)}>
         {furniture.sofa ? (
           <FurnitureItem item={furniture.sofa} drag={drag}>
-            <Sofa />
+            <Suspense fallback={null}>
+              <Sofa />
+            </Suspense>
           </FurnitureItem>
         ) : null}
         {furniture['coffee-table'] ? (

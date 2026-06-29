@@ -166,13 +166,14 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   applyServerEvent: (event) => {
     if (event.type === 'room.state.snapshot' && event.state) {
-      const furniture = cloneLayout(event.state.furniture);
-      const wallObjects = cloneWallObjectLayout(event.state.wallObjects ?? get().initialWallObjects);
+      const snapshot = event.state;
+      const furniture = cloneLayout(snapshot.furniture);
+      const wallObjects = cloneWallObjectLayout(snapshot.wallObjects ?? get().initialWallObjects);
       set((state) => ({
         furniture,
         wallObjects,
-        objectives: cloneObjectives(event.state.objectives),
-        serverRevision: event.revision ?? event.state.revision,
+        objectives: cloneObjectives(snapshot.objectives),
+        serverRevision: event.revision ?? snapshot.revision,
         lastEventId: event.id,
         selectedId: hasFurniture(furniture, state.selectedId) ? state.selectedId : null,
       }));
