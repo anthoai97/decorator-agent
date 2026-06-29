@@ -23,7 +23,7 @@ class EventFactoryTests(unittest.TestCase):
         event = create_playground_event(
             {
                 "type": "SET_FURNITURE_ROTATION",
-                "payload": {"furnitureId": "sofa", "rotationYDegrees": 45},
+                "payload": {"furnitureId": "planter", "rotationYDegrees": 45},
             }
         )
 
@@ -169,7 +169,7 @@ class RequestHandlerTests(unittest.TestCase):
             "/api/commands",
             {
                 "type": "SET_FURNITURE_ROTATION",
-                "payload": {"furnitureId": "sofa", "rotationYDegrees": 45},
+                "payload": {"furnitureId": "planter", "rotationYDegrees": 45},
             },
         )
 
@@ -186,7 +186,7 @@ class RequestHandlerTests(unittest.TestCase):
             "/api/commands",
             {
                 "type": "SET_FURNITURE_ROTATION",
-                "payload": {"furnitureId": "sofa", "rotationYDegrees": 45},
+                "payload": {"furnitureId": "planter", "rotationYDegrees": 45},
             },
         )
 

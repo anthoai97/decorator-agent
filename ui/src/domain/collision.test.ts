@@ -54,6 +54,12 @@ describe('collision helpers', () => {
   it('creates a complete non-overlapping initial layout', () => {
     const layout = createInitialFurnitureLayout();
 
+    expect(roomDefinition).toEqual({
+      width: 5.8,
+      depth: 4.4,
+      height: 2.65,
+      bounds: { minX: -2.9, maxX: 2.9, minZ: -2.2, maxZ: 2.2 },
+    });
     expect(Object.keys(layout)).toEqual(furnitureCatalog.map((item) => item.id));
     expect(layout.rug.name).toBe('Area rug');
     expect(layout.rug.movable).toBe(true);
@@ -131,8 +137,8 @@ describe('collision helpers', () => {
     const footprint = createFootprint(clamped.position, size);
 
     expect(clamped.position.y).toBe(0);
-    expect(footprint.minX).toBeGreaterThanOrEqual(-4.62);
-    expect(footprint.maxZ).toBeLessThanOrEqual(3.22);
+    expect(footprint.minX).toBeGreaterThanOrEqual(-2.72);
+    expect(footprint.maxZ).toBeLessThanOrEqual(2.02);
   });
 
   it('detects overlapping furniture', () => {
@@ -159,13 +165,13 @@ describe('collision helpers', () => {
   it('applies valid transform patches without mutating the input layout', () => {
     const layout = createInitialFurnitureLayout();
     const result = applyTransformPatch(layout, roomDefinition, 'coffee-table', {
-      position: { x: 1.2, z: 1.6 },
+      position: { x: -0.2, z: 1.0 },
       rotation: { yDegrees: 45 },
     });
 
     expect(result.applied).toBe(true);
-    expect(result.layout['coffee-table'].position.x).toBe(1.2);
-    expect(result.layout['coffee-table'].position.z).toBe(1.6);
+    expect(result.layout['coffee-table'].position.x).toBe(-0.2);
+    expect(result.layout['coffee-table'].position.z).toBe(1.0);
     expect(result.layout['coffee-table'].rotation.yDegrees).toBe(45);
     expect(layout['coffee-table'].position.x).not.toBe(1.2);
   });

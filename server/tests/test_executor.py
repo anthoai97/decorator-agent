@@ -60,7 +60,7 @@ class CommandExecutorTests(unittest.TestCase):
                     "payload": {
                         "furnitureId": "coffee-table",
                         "rotationYDegrees": 45,
-                        "position": {"x": 1.2, "z": 1.6},
+                        "position": {"x": -0.2, "z": 1.0},
                     },
                 }
             )
@@ -68,10 +68,10 @@ class CommandExecutorTests(unittest.TestCase):
             furniture = store.load_state()["furniture"]["coffee-table"]
 
             self.assertTrue(result["accepted"])
-            self.assertEqual(furniture["position"]["x"], 1.2)
-            self.assertEqual(furniture["position"]["z"], 1.6)
+            self.assertEqual(furniture["position"]["x"], -0.2)
+            self.assertEqual(furniture["position"]["z"], 1.0)
             self.assertEqual(furniture["rotation"]["yDegrees"], 45)
-            self.assertEqual(result["events"][0]["patch"]["furniture"]["coffee-table"]["position"]["x"], 1.2)
+            self.assertEqual(result["events"][0]["patch"]["furniture"]["coffee-table"]["position"]["x"], -0.2)
 
             store.close()
 

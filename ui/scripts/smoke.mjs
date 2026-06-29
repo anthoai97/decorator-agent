@@ -36,8 +36,11 @@ try {
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.waitForSelector('canvas', { timeout: 15000 });
     await page.waitForTimeout(900);
+    await page.click('#reset-layout');
+    await page.waitForTimeout(500);
 
     const clickTarget = await selectFurnitureForSmoke(page, viewport);
+    const selectedNameForInspector = await page.locator('#selected-name').textContent();
     const inspectorXInput = page.locator('.field-grid input').nth(1);
     const originalXValue = await inspectorXInput.inputValue();
     await inspectorXInput.fill('');
@@ -52,12 +55,15 @@ try {
     if (Number(committedXValue) !== -1) {
       throw new Error(`${viewport.name}: inspector X input did not commit negative value: ${committedXValue}`);
     }
+    const decimalProbeXValue = '-1.1';
     await inspectorXInput.fill('');
-    await inspectorXInput.type(originalXValue);
+    await inspectorXInput.type(decimalProbeXValue);
     await page.waitForTimeout(300);
     const decimalXValue = await inspectorXInput.inputValue();
-    if (decimalXValue !== originalXValue) {
-      throw new Error(`${viewport.name}: inspector X input did not preserve decimal draft: ${decimalXValue}`);
+    if (decimalXValue !== decimalProbeXValue) {
+      throw new Error(
+        `${viewport.name}: inspector X input did not preserve decimal draft for ${selectedNameForInspector}: expected=${decimalProbeXValue}, current=${decimalXValue}`,
+      );
     }
     await inspectorXInput.fill(originalXValue);
     await page.waitForTimeout(300);

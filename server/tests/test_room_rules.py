@@ -59,10 +59,10 @@ class RoomRuleTests(unittest.TestCase):
             rotation_aware_size(clamped["baseSize"], clamped["rotation"]["yDegrees"]),
         )
 
-        self.assertGreaterEqual(footprint["minX"], -4.62)
-        self.assertLessEqual(footprint["maxX"], 4.62)
-        self.assertGreaterEqual(footprint["minZ"], -3.22)
-        self.assertLessEqual(footprint["maxZ"], 3.22)
+        self.assertGreaterEqual(footprint["minX"], -2.72)
+        self.assertLessEqual(footprint["maxX"], 2.72)
+        self.assertGreaterEqual(footprint["minZ"], -2.02)
+        self.assertLessEqual(footprint["maxZ"], 2.02)
         self.assertEqual(clamped["position"]["y"], 0)
 
     def test_applies_valid_transform_without_mutating_input_layout(self) -> None:
@@ -72,16 +72,16 @@ class RoomRuleTests(unittest.TestCase):
             layout,
             state["room"],
             "coffee-table",
-            {"position": {"x": 1.2, "z": 1.6}, "rotation": {"yDegrees": 45}},
+            {"position": {"x": -0.2, "z": 1.0}, "rotation": {"yDegrees": 45}},
         )
 
         self.assertTrue(result["applied"])
         self.assertFalse(result["clamped"])
         self.assertEqual(result["reason"], "applied")
-        self.assertEqual(result["layout"]["coffee-table"]["position"]["x"], 1.2)
-        self.assertEqual(result["layout"]["coffee-table"]["position"]["z"], 1.6)
+        self.assertEqual(result["layout"]["coffee-table"]["position"]["x"], -0.2)
+        self.assertEqual(result["layout"]["coffee-table"]["position"]["z"], 1.0)
         self.assertEqual(result["layout"]["coffee-table"]["rotation"]["yDegrees"], 45)
-        self.assertNotEqual(layout["coffee-table"]["position"]["x"], 1.2)
+        self.assertNotEqual(layout["coffee-table"]["position"]["x"], -0.2)
 
     def test_reports_successful_clamping_when_transform_exceeds_bounds(self) -> None:
         state = create_initial_state()

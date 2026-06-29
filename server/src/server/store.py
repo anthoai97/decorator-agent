@@ -277,17 +277,44 @@ def read_command_source(command: JsonObject) -> str:
 
 def reconcile_state_with_catalog(state: JsonObject, removed_furniture_ids: set[str]) -> JsonObject:
     initial_state = create_initial_state()
+    revision = int(state.get("revision", initial_state["revision"]))
+    objectives = deepcopy(state.get("objectives", []))
+
+    if has_stored_room_dimension_change(state.get("room"), initial_state["room"]):
+        return {
+            **deepcopy(state),
+            "revision": revision,
+            "room": deepcopy(initial_state["room"]),
+            "furniture": deepcopy(initial_state["furniture"]),
+            "objectives": objectives,
+        }
 
     return {
         **deepcopy(state),
-        "revision": int(state.get("revision", initial_state["revision"])),
+        "revision": revision,
         "room": merge_object(initial_state["room"], state.get("room")),
         "furniture": reconcile_furniture_layout(
             initial_state["furniture"],
             state.get("furniture"),
             removed_furniture_ids,
         ),
-        "objectives": deepcopy(state.get("objectives", [])),
+        "objectives": objectives,
+    }
+
+
+def has_stored_room_dimension_change(stored_room: Any, catalog_room: JsonObject) -> bool:
+    if not isinstance(stored_room, dict):
+        return False
+
+    return room_dimensions(stored_room) != room_dimensions(catalog_room)
+
+
+def room_dimensions(room: JsonObject) -> JsonObject:
+    return {
+        "width": room.get("width"),
+        "depth": room.get("depth"),
+        "height": room.get("height"),
+        "bounds": room.get("bounds"),
     }
 
 

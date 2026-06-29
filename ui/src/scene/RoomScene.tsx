@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 import { sendServerCommand } from '../api/serverEvents';
@@ -15,10 +15,25 @@ import { RoomShell } from './components/RoomShell';
 import { Rug } from './components/Rug';
 import { Sofa } from './components/Sofa';
 import { useFurnitureDrag, type FurnitureMoveCommit } from './interactions/useFurnitureDrag';
-import { DEFAULT_CAMERA_TARGET, TOP_VIEW_CAMERA_POSITION } from './roomView';
+import {
+  CAMERA_MAX_DISTANCE,
+  CAMERA_MIN_DISTANCE,
+  DEFAULT_CAMERA_POSITION,
+  DEFAULT_CAMERA_TARGET,
+  getOpenWallIdsForCamera,
+  type OpenWallIds,
+  TOP_VIEW_CAMERA_POSITION,
+} from './roomView';
 
 export function RoomScene() {
   const { camera } = useThree();
+  const [openWallIds, setOpenWallIds] = useState<OpenWallIds>(() =>
+    getOpenWallIdsForCamera(
+      { x: DEFAULT_CAMERA_POSITION[0], z: DEFAULT_CAMERA_POSITION[2] },
+      { x: DEFAULT_CAMERA_TARGET[0], z: DEFAULT_CAMERA_TARGET[2] },
+    ),
+  );
+  const openWallIdsRef = useRef(openWallIds);
   const furniture = useRoomStore((state) => state.furniture);
   const selectFurniture = useRoomStore((state) => state.selectFurniture);
   const showLayoutStatus = useRoomStore((state) => state.showLayoutStatus);
@@ -65,9 +80,27 @@ export function RoomScene() {
     }
 
     camera.position.set(...TOP_VIEW_CAMERA_POSITION);
-    camera.lookAt(0, 0, 0);
+    camera.lookAt(...DEFAULT_CAMERA_TARGET);
+
+    if (controlsRef.current) {
+      controlsRef.current.target.set(...DEFAULT_CAMERA_TARGET);
+      controlsRef.current.update();
+    }
+
     setCameraMode('orbit');
   }, [camera, cameraMode, setCameraMode]);
+
+  useFrame(() => {
+    const nextOpenWallIds = getOpenWallIdsForCamera(
+      { x: camera.position.x, z: camera.position.z },
+      { x: DEFAULT_CAMERA_TARGET[0], z: DEFAULT_CAMERA_TARGET[2] },
+    );
+
+    if (openWallIdsRef.current[0] !== nextOpenWallIds[0] || openWallIdsRef.current[1] !== nextOpenWallIds[1]) {
+      openWallIdsRef.current = nextOpenWallIds;
+      setOpenWallIds(nextOpenWallIds);
+    }
+  });
 
   function handleDragPlanePointerDown() {
     selectFurniture(null);
@@ -75,11 +108,11 @@ export function RoomScene() {
 
   return (
     <>
-      <color attach="background" args={['#cfd8e3']} />
+      <color attach="background" args={['#9aa6b2']} />
       <hemisphereLight args={['#f6fbff', '#b2a28d', 2.2]} />
       <directionalLight position={[2.4, 5.2, 2.8]} intensity={2.4} />
       <directionalLight position={[-4, 3, -3]} color="#bfd7ff" intensity={0.8} />
-      <RoomShell />
+      <RoomShell openWallIds={openWallIds} />
       <group onPointerMissed={() => selectFurniture(null)}>
         {furniture.sofa ? (
           <FurnitureItem item={furniture.sofa} drag={drag}>
@@ -123,8 +156,8 @@ export function RoomScene() {
       <OrbitControls
         ref={controlsRef}
         enableDamping
-        minDistance={4.4}
-        maxDistance={11}
+        minDistance={CAMERA_MIN_DISTANCE}
+        maxDistance={CAMERA_MAX_DISTANCE}
         maxPolarAngle={Math.PI * 0.48}
         target={DEFAULT_CAMERA_TARGET}
       />

@@ -84,6 +84,32 @@ class SQLiteStoreTests(unittest.TestCase):
 
             store.close()
 
+    def test_load_state_resets_layout_when_stored_room_dimensions_change(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SQLiteStore(Path(directory) / "state.sqlite3")
+            command = validate_command({"type": "REMOVE_FURNITURE", "payload": {"furnitureId": "rug"}})
+            state = create_initial_state()
+            state["revision"] = 3
+            state["objectives"] = [{"id": "objective-1", "title": "Keep walking paths open"}]
+            state["room"] = {
+                "width": 9.6,
+                "depth": 6.8,
+                "height": 2.75,
+                "bounds": {"minX": -4.8, "maxX": 4.8, "minZ": -3.4, "maxZ": 3.4},
+            }
+            state["furniture"]["sofa"]["position"] = {"x": -4.0, "y": 0, "z": -2.8}
+            del state["furniture"]["rug"]
+            store.record_accepted_command(command, [create_state_event(command, state)], state)
+
+            loaded_state = store.load_state()
+
+            self.assertEqual(loaded_state["revision"], 3)
+            self.assertEqual(loaded_state["objectives"], state["objectives"])
+            self.assertEqual(loaded_state["room"], create_initial_state()["room"])
+            self.assertEqual(loaded_state["furniture"], create_initial_state()["furniture"])
+
+            store.close()
+
     def test_load_state_keeps_currently_removed_furniture_removed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = SQLiteStore(Path(directory) / "state.sqlite3")

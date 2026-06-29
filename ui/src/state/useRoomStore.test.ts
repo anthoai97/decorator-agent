@@ -10,11 +10,11 @@ beforeEach(() => {
 
 describe('useRoomStore', () => {
   it('selects furniture and rotates it by 45 degrees', () => {
-    useRoomStore.getState().selectFurniture('sofa');
+    useRoomStore.getState().selectFurniture('planter');
     useRoomStore.getState().rotateSelected();
 
-    expect(useRoomStore.getState().selectedId).toBe('sofa');
-    expect(useRoomStore.getState().furniture.sofa.rotation.yDegrees).toBe(45);
+    expect(useRoomStore.getState().selectedId).toBe('planter');
+    expect(useRoomStore.getState().furniture.planter.rotation.yDegrees).toBe(45);
   });
 
   it('moves furniture through collision validation', () => {
