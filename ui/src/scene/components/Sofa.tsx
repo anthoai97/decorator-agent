@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useGLTF } from '@react-three/drei';
-import type { Object3D } from 'three';
+import type { Intersection, Object3D, Raycaster } from 'three';
 
 type Vector3Tuple = [number, number, number];
 
@@ -18,6 +18,10 @@ const SOFA_MODEL_Y_SCALE = SOFA_TARGET_HEIGHT / SOFA_SOURCE_SIZE.height;
 export const SOFA_MODEL_URL = '/assets/models/sofa-01.glb';
 export const SOFA_USE_DRACO = false;
 export const SOFA_USE_MESHOPT = true;
+export const SOFA_INTERACTION_BOUNDS = {
+  size: [2.49, 1.21, 0.93] as Vector3Tuple,
+  position: [0, 0.605, 0] as Vector3Tuple,
+};
 export const SOFA_MODEL_TRANSFORM: {
   position: Vector3Tuple;
   rotation: Vector3Tuple;
@@ -42,6 +46,10 @@ export function Sofa() {
 
   return (
     <group name="Sofa geometry">
+      <mesh name="Sofa interaction bounds" position={SOFA_INTERACTION_BOUNDS.position}>
+        <boxGeometry args={SOFA_INTERACTION_BOUNDS.size} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
+      </mesh>
       <primitive
         object={sofaScene}
         position={SOFA_MODEL_TRANSFORM.position}
@@ -58,10 +66,13 @@ function cloneWithShadows(scene: Object3D) {
   clone.traverse((child) => {
     child.castShadow = true;
     child.receiveShadow = true;
+    child.raycast = disabledRaycast;
   });
 
   return clone;
 }
+
+function disabledRaycast(_raycaster: Raycaster, _intersections: Intersection[]) {}
 
 function roundMeters(value: number) {
   return Number(value.toFixed(2));

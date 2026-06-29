@@ -63,9 +63,9 @@ Use the Meshopt-compressed profile generated from the source sofa:
 node tools/glb-compress/bin/compress-glb.mjs \
   samples_artifact/3d/sofa-01.glb \
   /tmp/sofa-01.optimized.glb \
-  --ratio 0.15 \
-  --error 0.01 \
+  --ratio 0.5 \
+  --error 0.001 \
   --compress meshopt
 ```
 
-This keeps the runtime model around 394 KB and 42k triangles, while avoiding the Draco loader path.
+This keeps the runtime model around 949 KB and 132k triangles, while avoiding the Draco loader path. The sofa component should use a simple invisible interaction box for picking and dragging so the detailed GLB is visual-only and does not make pointer raycasts expensive.

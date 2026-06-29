@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  SOFA_INTERACTION_BOUNDS,
   SOFA_MODEL_TRANSFORM,
   SOFA_MODEL_URL,
   SOFA_USE_DRACO,
@@ -16,6 +17,13 @@ describe('Sofa model contract', () => {
   it('loads the compressed sofa with Meshopt and no Draco decoder', () => {
     expect(SOFA_USE_DRACO).toBe(false);
     expect(SOFA_USE_MESHOPT).toBe(true);
+  });
+
+  it('uses a simple interaction box for sofa picking and dragging', () => {
+    expect(SOFA_INTERACTION_BOUNDS).toEqual({
+      size: [2.49, 1.21, 0.93],
+      position: [0, 0.605, 0],
+    });
   });
 
   it('rotates and scales the source model into the existing sofa footprint', () => {
