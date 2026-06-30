@@ -24,7 +24,7 @@
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 2
 
-- [ ] Checkpoint: Foundation review
+- [x] Checkpoint: Foundation review
   - Verify: `python -m server` starts, `/health`, `/docs`, `/openapi.json`, and `/api/state` work.
 
 ## Phase 2: State Mutation and Events
