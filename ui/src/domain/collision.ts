@@ -24,10 +24,7 @@ export function cloneLayout(layout: FurnitureLayoutMap): FurnitureLayoutMap {
     Object.values(layout).map((item) => [
       item.id,
       {
-        id: item.id,
-        name: item.name,
-        movable: item.movable,
-        blocksPlacement: item.blocksPlacement,
+        ...item,
         position: { ...item.position },
         rotation: { ...item.rotation },
         baseSize: { ...item.baseSize },

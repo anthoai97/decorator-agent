@@ -65,6 +65,16 @@ describe('ModelArtifact', () => {
     expect(element.props.scale).toEqual([2, 2, 2]);
   });
 
+  it('keeps loaded model resources alive across scene updates', () => {
+    useGltfMock.mockReturnValue({ scene: new Object3D() });
+
+    const element = ModelArtifact({
+      url: 'http://127.0.0.1:8787/api/artifacts/seed-sofa-01/content',
+    });
+
+    expect(element.props.dispose).toBeNull();
+  });
+
   it('allows loader options to be overridden', () => {
     useGltfMock.mockReturnValue({ scene: new Object3D() });
 

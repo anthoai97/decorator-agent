@@ -39,6 +39,7 @@ export function ModelArtifact({
       position={position}
       rotation={rotation}
       scale={scale}
+      dispose={null}
     />
   );
 }

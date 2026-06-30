@@ -26,6 +26,33 @@ describe('useRoomStore', () => {
     expect(useRoomStore.getState().furniture['coffee-table'].position.z).toBe(1.6);
   });
 
+  it('keeps sofa artifact metadata connected when moving another furniture item', () => {
+    useRoomStore.getState().hydrateArtifactMetadata({
+      artifacts: [
+        {
+          id: 'seed-sofa-01',
+          kind: 'model3d',
+          objectType: 'sofa',
+          displayName: 'Sofa',
+          placement: 'floor',
+          contentType: 'model/gltf-binary',
+          url: 'http://127.0.0.1:8787/api/artifacts/seed-sofa-01/content',
+          thumbnailUrl: null,
+          tags: ['sofa'],
+        },
+      ],
+      missingIds: [],
+    });
+
+    const result = useRoomStore.getState().moveFurniture('coffee-table', { x: 1.2, z: 1.6 });
+
+    expect(result.applied).toBe(true);
+    expect(useRoomStore.getState().furniture.sofa.artifactId).toBe('seed-sofa-01');
+    expect(useRoomStore.getState().artifactMetadataById['seed-sofa-01']?.url).toBe(
+      'http://127.0.0.1:8787/api/artifacts/seed-sofa-01/content',
+    );
+  });
+
   it('rejects overlapping inspector transforms', () => {
     const sofaPosition = useRoomStore.getState().furniture.sofa.position;
     const result = useRoomStore.getState().setTransformFromInspector('coffee-table', {
