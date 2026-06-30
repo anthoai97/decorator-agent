@@ -54,7 +54,7 @@
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 6
 
-- [ ] Checkpoint: Artifact API review
+- [x] Checkpoint: Artifact API review
   - Verify: `cd ui && npm test`
 
 ## Phase 4: Compatibility and Launch Readiness
