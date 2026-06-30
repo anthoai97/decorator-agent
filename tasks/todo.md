@@ -44,7 +44,7 @@
 
 ## Phase 3: Artifact API
 
-- [ ] Task 6: Migrate artifact search and batch lookup
+- [x] Task 6: Migrate artifact search and batch lookup
   - Acceptance: filters, pagination, `ids`, `missingIds`, trusted host handling, and `SERVER_PUBLIC_BASE_URL` behavior are preserved.
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 3

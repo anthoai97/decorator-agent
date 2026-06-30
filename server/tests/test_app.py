@@ -443,6 +443,90 @@ def test_fastapi_events_stream_receives_live_command_events(fastapi_client: Test
     assert "event: room.state.snapshot" in frame
 
 
+def test_fastapi_artifact_search_returns_seed_sofa(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/artifacts?kind=model3d&type=sofa")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["pagination"] == {"page": 1, "pageSize": 24, "totalItems": 1, "totalPages": 1}
+    assert len(body["artifacts"]) == 1
+    artifact = body["artifacts"][0]
+    assert artifact["id"] == "seed-sofa-01"
+    assert artifact["kind"] == "model3d"
+    assert artifact["objectType"] == "sofa"
+    assert artifact["url"] == "http://testserver/api/artifacts/seed-sofa-01/content"
+
+
+def test_fastapi_artifact_search_filters_by_tag_query_param(fastapi_client: TestClient) -> None:
+    fastapi_client.app.state.services.artifact_store.seed_artifacts((create_test_table_artifact(),))
+
+    response = fastapi_client.get("/api/artifacts?tag=wood")
+
+    assert response.status_code == 200
+    assert [artifact["id"] for artifact in response.json()["artifacts"]] == ["seed-table-01"]
+
+
+def test_fastapi_artifact_batch_lookup_returns_found_and_missing_ids(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/artifacts?ids=missing-a,seed-sofa-01,seed-sofa-01,missing-b")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert [artifact["id"] for artifact in body["artifacts"]] == ["seed-sofa-01"]
+    assert body["missingIds"] == ["missing-a", "missing-b"]
+
+
+def test_fastapi_artifact_batch_lookup_validates_ids(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/artifacts?ids=,,")
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert "ids" in response.json()["error"]["message"]
+
+
+def test_fastapi_artifact_search_validates_pagination(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/artifacts?page=0")
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert "page" in response.json()["error"]["message"]
+
+
+def test_fastapi_artifact_search_rejects_over_max_page_size(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/artifacts?pageSize=101")
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {"code": "VALIDATION_ERROR", "message": "pageSize must be no greater than 100"}
+    }
+
+
+def test_fastapi_artifact_metadata_ignores_untrusted_host_header(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get(
+        "/api/artifacts?kind=model3d&type=sofa",
+        headers={"Host": "attacker.example"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["artifacts"][0]["url"] == "http://testserver/api/artifacts/seed-sofa-01/content"
+
+
+def test_fastapi_artifact_metadata_uses_configured_public_base_url(temp_database_path: Path) -> None:
+    app = create_app(
+        database_path=temp_database_path,
+        heartbeat_seconds=0.1,
+        public_base_url="https://assets.example.test/artifacts/",
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/api/artifacts?kind=model3d&type=sofa")
+
+    assert response.status_code == 200
+    assert (
+        response.json()["artifacts"][0]["url"]
+        == "https://assets.example.test/artifacts/api/artifacts/seed-sofa-01/content"
+    )
+
+
 class RequestHandlerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()
