@@ -5,14 +5,25 @@ import sys
 import tempfile
 import threading
 import unittest
+import warnings
 from http.client import HTTPConnection
 from pathlib import Path
 from unittest.mock import patch
+
+from starlette.exceptions import StarletteDeprecationWarning
+
+warnings.filterwarnings(
+    "ignore",
+    category=StarletteDeprecationWarning,
+    message="Using `httpx` with `starlette.testclient` is deprecated.*",
+)
+from starlette.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from server.app import (
     RequestHandler,
+    create_app,
     create_http_server,
     create_agent_placeholder_event,
     create_playground_event,
@@ -20,6 +31,7 @@ from server.app import (
 from server.artifacts import Artifact, ArtifactDimensions
 from server.artifact_store import ArtifactStore
 from server.db import create_sqlite_engine
+from server.store import SQLiteStore
 
 
 class EventFactoryTests(unittest.TestCase):
@@ -117,6 +129,54 @@ class ServerLifecycleTests(unittest.TestCase):
                     )
             finally:
                 server.server_close()
+
+
+class FastAPIAppFactoryTests(unittest.TestCase):
+    def test_create_app_serves_health_and_documentation(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            app = create_app(
+                database_path=Path(tempdir) / "state.sqlite3",
+                heartbeat_seconds=0.1,
+            )
+
+            with TestClient(app) as client:
+                self.assertEqual(client.get("/health").json(), {"ok": True})
+                self.assertEqual(client.get("/openapi.json").status_code, 200)
+                self.assertEqual(client.get("/docs").status_code, 200)
+
+    def test_create_app_bootstraps_runtime_services(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            database_path = Path(tempdir) / "state.sqlite3"
+            app = create_app(
+                database_path=database_path,
+                heartbeat_seconds=0.1,
+            )
+
+            with TestClient(app) as client:
+                runtime_seed = Path(tempdir) / "artifacts" / "models" / "sofa-01.glb"
+                artifact = client.app.state.services.artifact_store.get_artifact("seed-sofa-01")
+
+                self.assertTrue(runtime_seed.exists())
+                self.assertGreater(runtime_seed.stat().st_size, 1_000_000)
+                self.assertEqual(artifact.object_type, "sofa")
+
+    def test_create_app_closes_store_on_shutdown(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            original_close = SQLiteStore.close
+
+            def close_and_record(store: SQLiteStore) -> None:
+                original_close(store)
+
+            with patch("server.app.SQLiteStore.close", autospec=True, side_effect=close_and_record) as close_store:
+                app = create_app(
+                    database_path=Path(tempdir) / "state.sqlite3",
+                    heartbeat_seconds=0.1,
+                )
+
+                with TestClient(app):
+                    pass
+
+                close_store.assert_called_once()
 
 
 class RequestHandlerTests(unittest.TestCase):

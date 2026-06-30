@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 import json
 import os
 import sys
@@ -10,6 +13,8 @@ from queue import Empty
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 from uuid import uuid4
+
+from fastapi import FastAPI
 
 from server.artifacts import (
     ArtifactNotFoundError,
@@ -31,6 +36,70 @@ DEFAULT_ARTIFACT_PAGE_SIZE = 24
 MAX_ARTIFACT_IDS_PER_BATCH = 100
 MAX_ARTIFACT_PAGE_SIZE = 100
 POST_ROUTES = frozenset({"/api/commands", "/api/playground/commands", "/api/agent/runs"})
+
+
+@dataclass
+class ServerServices:
+    public_base_url: str | None
+    artifact_root: Path
+    store: SQLiteStore
+    artifact_store: ArtifactStore
+    executor: CommandExecutor
+    broker: EventBroker
+    heartbeat_seconds: float
+
+    def close(self) -> None:
+        self.store.close()
+
+
+def create_services(
+    database_path: str | Path,
+    heartbeat_seconds: float = 15.0,
+    public_base_url: str | None = None,
+) -> ServerServices:
+    normalized_public_base_url = normalize_public_base_url(public_base_url)
+    artifact_root = Path(database_path).parent / "artifacts"
+    bootstrap_seed_artifacts(artifact_root)
+    store = SQLiteStore(database_path)
+    artifact_store = ArtifactStore(store.engine)
+    artifact_store.seed_artifacts(SEED_ARTIFACTS)
+
+    return ServerServices(
+        public_base_url=normalized_public_base_url,
+        artifact_root=artifact_root,
+        store=store,
+        artifact_store=artifact_store,
+        executor=CommandExecutor(store),
+        broker=EventBroker(),
+        heartbeat_seconds=heartbeat_seconds,
+    )
+
+
+def create_app(
+    database_path: str | Path = ".data/playground.sqlite3",
+    heartbeat_seconds: float = 15.0,
+    public_base_url: str | None = None,
+) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        services = create_services(
+            database_path=database_path,
+            heartbeat_seconds=heartbeat_seconds,
+            public_base_url=public_base_url,
+        )
+        app.state.services = services
+        try:
+            yield
+        finally:
+            services.close()
+
+    app = FastAPI(title="Decorator Agent API", version="0.1.0", lifespan=lifespan)
+
+    @app.get("/health")
+    def health() -> JsonObject:
+        return {"ok": True}
+
+    return app
 
 
 def create_playground_event(command: JsonObject) -> JsonObject:
@@ -485,19 +554,14 @@ def run_server(
     database_path: str | Path = ".data/playground.sqlite3",
     public_base_url: str | None = None,
 ) -> None:
-    server = create_http_server(
-        host,
-        port,
-        database_path,
+    import uvicorn
+
+    app = create_app(
+        database_path=database_path,
         public_base_url=public_base_url or os.environ.get("SERVER_PUBLIC_BASE_URL"),
     )
     print(f"Playground event server listening on http://{host}:{port}")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.server_close()
+    uvicorn.run(app, host=host, port=port)
 
 
 def read_query_event_id(query: str, key: str, default: int) -> int:
