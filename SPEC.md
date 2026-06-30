@@ -7,6 +7,7 @@
 3. Existing API paths and response shapes should remain backward compatible unless explicitly approved.
 4. SQLite remains the local persistence layer, and existing SQLAlchemy store modules remain the source of truth for state, commands, events, and artifacts.
 5. FastAPI is being introduced for typed request/response schemas, clearer validation, OpenAPI docs, simpler route organization, and a better test client.
+6. The backend test suite should move from `unittest` to pytest as part of this migration.
 
 Correct these assumptions before implementation if any of them are wrong.
 
@@ -38,7 +39,7 @@ Core acceptance criteria:
 - Validation/schema layer: Pydantic models through FastAPI.
 - Persistence: existing SQLAlchemy `>=2.0,<3` and SQLite store modules.
 - UI client: existing React/Vite app in `ui/`.
-- Tests: existing Python `unittest` suite plus FastAPI `TestClient`-style route tests; existing Vitest and Playwright smoke stack.
+- Tests: pytest for the Python server, including FastAPI `TestClient`-style route tests; existing Vitest and Playwright smoke stack for the UI.
 
 ## Commands
 
@@ -60,7 +61,7 @@ Python tests:
 
 ```bash
 cd server
-uv run --python 3.13 python -m unittest discover -s tests
+uv run --python 3.13 pytest
 ```
 
 UI development:
@@ -163,7 +164,7 @@ server/src/server/api/routes/events.py
 server/src/server/api/routes/agent.py
 ```
 
-Test files should stay under `server/tests/`. Route-level FastAPI tests may replace `HTTPConnection` lifecycle tests where that reduces boilerplate, but existing behavior assertions should not be weakened.
+Test files should stay under `server/tests/`. Route-level FastAPI tests should use pytest fixtures where that reduces boilerplate, and may replace `HTTPConnection` lifecycle tests where behavior remains equivalent. Existing behavior assertions should not be weakened during conversion.
 
 ## Code Style
 
@@ -230,8 +231,9 @@ Conventions:
 
 Server tests:
 
-- Continue using `unittest` unless a separate test-framework change is approved.
-- Add FastAPI app-factory tests using a temporary SQLite database and seeded artifact directory.
+- Use pytest as the server test runner.
+- Convert existing `unittest.TestCase` tests to pytest-style tests and fixtures incrementally, without weakening assertions.
+- Add FastAPI app-factory tests using pytest fixtures, temporary SQLite databases, and seeded artifact directories.
 - Cover each route's status code, response envelope, and important headers.
 - Preserve tests for trusted host handling and `SERVER_PUBLIC_BASE_URL`.
 - Preserve tests proving artifact content is streamed rather than read all at once.
@@ -263,7 +265,7 @@ Always:
 - Keep the error envelope consistent across routes.
 - Use temporary databases and artifact roots in tests.
 - Keep large artifact responses streamed.
-- Run server tests, UI tests, and smoke tests before shipping.
+- Run pytest server tests, UI tests, and smoke tests before shipping.
 - Update `README.md` if the server command or Docker behavior changes.
 
 Ask first:
@@ -272,7 +274,7 @@ Ask first:
 - Changing the SQLite schema or adding migrations.
 - Changing response shapes consumed by `ui/src/api`.
 - Restricting CORS from the current local-development-friendly behavior.
-- Replacing `unittest` with pytest.
+- Replacing pytest with another server test framework after this migration.
 - Adding a linter/formatter or changing repository-wide style tooling.
 - Adding new user-facing endpoints beyond the migration target.
 
@@ -292,7 +294,7 @@ Never:
 - `/docs` and `/openapi.json` are available in local development.
 - All existing backend endpoints behave compatibly with current tests.
 - FastAPI validation errors are normalized to the existing `error.code` and `error.message` shape.
-- `cd server && uv run --python 3.13 python -m unittest discover -s tests` passes.
+- `cd server && uv run --python 3.13 pytest` passes.
 - `cd ui && npm test` passes.
 - `cd ui && npm run smoke` passes.
 - README instructions still work for Docker and local development.

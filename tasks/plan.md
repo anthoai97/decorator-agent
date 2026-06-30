@@ -10,6 +10,7 @@ Migrate the server HTTP layer from `BaseHTTPRequestHandler`/`ThreadingHTTPServer
 - `/api/agent/runs` remains the current placeholder route.
 - CORS remains permissive for local development.
 - Runtime `/docs` and `/openapi.json` are enough; generated OpenAPI output will not be committed unless requested.
+- The backend test suite will move from `unittest` to pytest before continuing route migration.
 
 ## Dependency Graph
 
@@ -19,6 +20,9 @@ FastAPI/Uvicorn dependencies
     v
 ASGI app factory and server runtime
     |
+    +--> Pytest runner and shared fixtures
+    |       |
+    |       v
     +--> Runtime services: SQLiteStore, ArtifactStore, CommandExecutor, EventBroker
     |       |
     |       +--> State endpoint
@@ -48,6 +52,7 @@ ASGI app factory and server runtime
 - Keep response fields camelCase where the UI already depends on camelCase.
 - Replace FastAPI's default validation error body with the existing `{"error": {"code": "...", "message": "..."}}` envelope.
 - Prefer FastAPI `StreamingResponse` for SSE and artifact content, preserving current streaming semantics.
+- Use pytest as the backend test runner and prefer fixtures over repeated `unittest.TestCase` setup.
 
 ## Phase 1: ASGI Foundation
 
@@ -66,7 +71,7 @@ ASGI app factory and server runtime
 **Verification:**
 
 - [ ] Tests pass for app creation, `/health`, docs availability, seed artifact bootstrapping, and artifact metadata seeding.
-- [ ] Command succeeds: `cd server && uv run --python 3.13 python -m unittest discover -s tests`
+- [ ] Command succeeds: `cd server && uv run --python 3.13 pytest`
 - [ ] Manual startup succeeds: `cd server && uv run --python 3.13 python -m server --host 127.0.0.1 --port 8787`
 
 **Dependencies:** None
@@ -81,7 +86,35 @@ ASGI app factory and server runtime
 
 **Estimated scope:** M
 
-### Task 2: Add Shared HTTP Contract Helpers With State Read Path
+### Task 2: Adopt Pytest Runner and Shared Fixtures
+
+**Description:** Replace the server test command with pytest, add pytest configuration and shared fixtures, and make the next FastAPI route tests use pytest patterns. Existing unittest-style tests may be converted incrementally as each route slice is touched, but the runner becomes pytest here.
+
+**Acceptance criteria:**
+
+- [ ] `server/pyproject.toml` includes pytest and `server/uv.lock` is updated.
+- [ ] `cd server && uv run --python 3.13 pytest` runs the full backend test suite.
+- [ ] Common temporary database and FastAPI client setup are available as pytest fixtures where useful.
+- [ ] New and modified FastAPI route tests use pytest-style fixtures/assertions rather than adding new `unittest.TestCase` classes.
+- [ ] Existing test assertions for state, commands, events, artifacts, store behavior, and room rules still run under pytest.
+
+**Verification:**
+
+- [ ] Command succeeds: `cd server && uv run --python 3.13 pytest`
+- [ ] Command succeeds: `cd server && uv build --out-dir /tmp/decorator-agent-server-build`
+
+**Dependencies:** Task 1
+
+**Files likely touched:**
+
+- `server/pyproject.toml`
+- `server/uv.lock`
+- `server/tests/conftest.py`
+- `server/tests/test_app.py`
+
+**Estimated scope:** M
+
+### Task 3: Add Shared HTTP Contract Helpers With State Read Path
 
 **Description:** Add the shared FastAPI error, validation, CORS, and base service dependency plumbing, then migrate `GET /api/state` as the first non-trivial route.
 
@@ -96,9 +129,9 @@ ASGI app factory and server runtime
 **Verification:**
 
 - [ ] Tests cover state response shape, validation envelope, unknown route envelope, and CORS preflight behavior.
-- [ ] Command succeeds: `cd server && uv run --python 3.13 python -m unittest discover -s tests`
+- [ ] Command succeeds: `cd server && uv run --python 3.13 pytest`
 
-**Dependencies:** Task 1
+**Dependencies:** Task 2
 
 **Files likely touched:**
 
@@ -119,7 +152,7 @@ ASGI app factory and server runtime
 
 ## Phase 2: State Mutation and Events
 
-### Task 3: Migrate Command Routes
+### Task 4: Migrate Command Routes
 
 **Description:** Migrate `POST /api/commands` and `POST /api/playground/commands` so commands still validate, mutate state, persist command/event rows, return compatibility envelopes, and publish events to live subscribers.
 
@@ -134,9 +167,9 @@ ASGI app factory and server runtime
 **Verification:**
 
 - [ ] Tests cover accepted furniture movement, wall-object movement, playground command compatibility, rejected command payloads, and unknown POST route behavior.
-- [ ] Command succeeds: `cd server && uv run --python 3.13 python -m unittest discover -s tests`
+- [ ] Command succeeds: `cd server && uv run --python 3.13 pytest`
 
-**Dependencies:** Task 2
+**Dependencies:** Task 3
 
 **Files likely touched:**
 
@@ -147,7 +180,7 @@ ASGI app factory and server runtime
 
 **Estimated scope:** M
 
-### Task 4: Migrate Event History and SSE Routes
+### Task 5: Migrate Event History and SSE Routes
 
 **Description:** Migrate `GET /api/events/history` and `GET /api/events`, preserving replay from persisted events, `Last-Event-ID`, `since`, live command events, heartbeat comments, and subscriber cleanup.
 
@@ -162,9 +195,9 @@ ASGI app factory and server runtime
 **Verification:**
 
 - [ ] Tests cover event history filtering, `Last-Event-ID`, live SSE delivery, invalid event ids, and cleanup.
-- [ ] Command succeeds: `cd server && uv run --python 3.13 python -m unittest discover -s tests`
+- [ ] Command succeeds: `cd server && uv run --python 3.13 pytest`
 
-**Dependencies:** Task 3
+**Dependencies:** Task 4
 
 **Files likely touched:**
 
@@ -183,7 +216,7 @@ ASGI app factory and server runtime
 
 ## Phase 3: Artifact API
 
-### Task 5: Migrate Artifact Search and Batch Lookup
+### Task 6: Migrate Artifact Search and Batch Lookup
 
 **Description:** Migrate `GET /api/artifacts` for both search mode and `ids=` batch mode, including pagination validation, filter aliases, duplicate ID handling, missing IDs, and trusted artifact URL generation.
 
@@ -198,9 +231,9 @@ ASGI app factory and server runtime
 **Verification:**
 
 - [ ] Tests cover seed sofa search, tag search, table metadata seeded in tests, batch found/missing IDs, invalid IDs, max IDs, invalid pagination, hostile host, and configured public base URL.
-- [ ] Command succeeds: `cd server && uv run --python 3.13 python -m unittest discover -s tests`
+- [ ] Command succeeds: `cd server && uv run --python 3.13 pytest`
 
-**Dependencies:** Task 2
+**Dependencies:** Task 3
 
 **Files likely touched:**
 
@@ -211,7 +244,7 @@ ASGI app factory and server runtime
 
 **Estimated scope:** M
 
-### Task 6: Migrate Artifact Metadata and Content Streaming
+### Task 7: Migrate Artifact Metadata and Content Streaming
 
 **Description:** Migrate `GET /api/artifacts/{artifactId}` and `GET /api/artifacts/{artifactId}/content`, preserving metadata shape, storage-key inclusion, not-found behavior, path traversal protection, content type, content length, cache header, and chunked file streaming.
 
@@ -226,9 +259,9 @@ ASGI app factory and server runtime
 **Verification:**
 
 - [ ] Tests cover metadata, seed GLB content, streaming guard, missing artifact, and path-safety behavior.
-- [ ] Command succeeds: `cd server && uv run --python 3.13 python -m unittest discover -s tests`
+- [ ] Command succeeds: `cd server && uv run --python 3.13 pytest`
 
-**Dependencies:** Task 5
+**Dependencies:** Task 6
 
 **Files likely touched:**
 
@@ -248,7 +281,7 @@ ASGI app factory and server runtime
 
 ## Phase 4: Compatibility and Launch Readiness
 
-### Task 7: Migrate Agent Placeholder and Remove HTTP Server Compatibility Shell
+### Task 8: Migrate Agent Placeholder and Remove HTTP Server Compatibility Shell
 
 **Description:** Migrate `POST /api/agent/runs`, remove obsolete `RequestHandler`/`ThreadingHTTPServer` implementation details, and update tests to use FastAPI-compatible helpers without weakening existing assertions.
 
@@ -263,9 +296,9 @@ ASGI app factory and server runtime
 
 - [ ] Tests cover the placeholder route and remaining event factory helpers.
 - [ ] Search confirms obsolete HTTP server classes are gone from production code.
-- [ ] Command succeeds: `cd server && uv run --python 3.13 python -m unittest discover -s tests`
+- [ ] Command succeeds: `cd server && uv run --python 3.13 pytest`
 
-**Dependencies:** Tasks 3 and 6
+**Dependencies:** Tasks 4 and 7
 
 **Files likely touched:**
 
@@ -275,7 +308,7 @@ ASGI app factory and server runtime
 
 **Estimated scope:** S
 
-### Task 8: Verify Tooling, Docker, README, and Smoke Stack
+### Task 9: Verify Tooling, Docker, README, and Smoke Stack
 
 **Description:** Finalize local/Docker startup compatibility and run the full verification suite, updating README or compose/Docker commands only if the canonical startup behavior changed.
 
@@ -288,12 +321,12 @@ ASGI app factory and server runtime
 
 **Verification:**
 
-- [ ] Command succeeds: `cd server && uv run --python 3.13 python -m unittest discover -s tests`
+- [ ] Command succeeds: `cd server && uv run --python 3.13 pytest`
 - [ ] Command succeeds: `cd ui && npm test`
 - [ ] Command succeeds: `cd ui && npm run smoke`
 - [ ] Optional Docker check succeeds: `docker compose up --build`
 
-**Dependencies:** Task 7
+**Dependencies:** Task 8
 
 **Files likely touched:**
 
@@ -313,9 +346,9 @@ ASGI app factory and server runtime
 
 ## Parallelization Opportunities
 
-- Tasks 3 and 5 can be developed in parallel after Task 2 if route registration and shared helpers are stable.
-- Task 4 must follow Task 3 because live SSE verification depends on command publishing.
-- Task 6 should follow Task 5 because it reuses artifact route helpers and base URL behavior.
+- Tasks 4 and 6 can be developed in parallel after Task 3 if route registration and shared helpers are stable.
+- Task 5 must follow Task 4 because live SSE verification depends on command publishing.
+- Task 7 should follow Task 6 because it reuses artifact route helpers and base URL behavior.
 - README/Docker verification can be reviewed in parallel with final route cleanup once `python -m server` behavior is stable.
 
 ## Risks and Mitigations
@@ -324,6 +357,7 @@ ASGI app factory and server runtime
 | --- | --- | --- |
 | FastAPI default validation responses differ from current API errors | High | Add custom exception handlers before migrating high-traffic routes and test exact envelopes |
 | SSE streaming behaves differently under ASGI than `http.server` | High | Migrate SSE as its own task with replay, live event, heartbeat, and cleanup tests |
+| Pytest migration changes test discovery or fixture isolation | Medium | Adopt pytest as its own task, run the full suite immediately, and preserve existing assertions while converting setup gradually |
 | Artifact content accidentally loads large GLB files into memory | Medium | Use a streaming iterator and keep the existing `Path.read_bytes` guard test |
 | Trusted host URL generation changes under TestClient/Uvicorn | Medium | Preserve explicit base URL helper tests for hostile host and public base URL |
 | Existing tests are too tied to `HTTPConnection` lifecycle | Medium | Replace route tests with FastAPI client helpers while keeping the same assertions |
