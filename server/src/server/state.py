@@ -19,6 +19,7 @@ FURNITURE_CATALOG: tuple[JsonObject, ...] = (
         "name": "Sofa",
         "movable": True,
         "blocksPlacement": True,
+        "artifactId": "seed-sofa-01",
         "defaultPosition": {"x": -0.9, "y": 0, "z": -1.4},
         "defaultRotationYDegrees": 0,
         "baseSize": {"width": 2.49, "height": 1.21, "depth": 0.93},
@@ -119,7 +120,7 @@ def reset_layout_state(state: JsonObject) -> JsonObject:
 
 
 def create_furniture_item(item: JsonObject) -> JsonObject:
-    return {
+    furniture_item = {
         "id": item["id"],
         "name": item["name"],
         "movable": item["movable"],
@@ -129,9 +130,14 @@ def create_furniture_item(item: JsonObject) -> JsonObject:
         "baseSize": deepcopy(item["baseSize"]),
     }
 
+    if isinstance(item.get("artifactId"), str):
+        furniture_item["artifactId"] = item["artifactId"]
+
+    return furniture_item
+
 
 def create_wall_object_item(item: JsonObject) -> JsonObject:
-    return {
+    wall_object_item = {
         "id": item["id"],
         "name": item["name"],
         "wallId": item["wallId"],
@@ -140,6 +146,11 @@ def create_wall_object_item(item: JsonObject) -> JsonObject:
         "size": deepcopy(item["size"]),
         "normalOffset": item["normalOffset"],
     }
+
+    if isinstance(item.get("artifactId"), str):
+        wall_object_item["artifactId"] = item["artifactId"]
+
+    return wall_object_item
 
 
 def normalize_degrees(value: float) -> float:

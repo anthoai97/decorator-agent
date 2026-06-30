@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import type { Artifact, ArtifactBatchResponse } from '../api/artifacts';
 import type { Objective, ServerStateResponse, ServerStreamEvent } from '../api/serverEvents';
 import { createInitialFurnitureLayout, roomDefinition } from '../data/furnitureCatalog';
 import { createInitialWallObjectLayout } from '../data/wallObjectCatalog';
@@ -35,6 +36,8 @@ interface RoomStore {
   wallObjects: WallObjectLayoutMap;
   initialWallObjects: WallObjectLayoutMap;
   objectives: Objective[];
+  artifactMetadataById: Record<string, Artifact>;
+  missingArtifactIds: string[];
   serverRevision: number;
   lastEventId: number;
   selectedId: FurnitureId | null;
@@ -52,6 +55,7 @@ interface RoomStore {
   importLayout: (layout: unknown) => ImportResult;
   hydrateServerState: (snapshot: ServerStateResponse) => void;
   applyServerEvent: (event: ServerStreamEvent) => void;
+  hydrateArtifactMetadata: (response: ArtifactBatchResponse) => void;
   setCameraMode: (mode: CameraMode) => void;
   setActiveDragMeasurementTarget: (target: DragMeasurementTarget | null) => void;
   showLayoutStatus: (message: string) => void;
@@ -67,6 +71,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   wallObjects: cloneWallObjectLayout(initialWallObjects),
   initialWallObjects: cloneWallObjectLayout(initialWallObjects),
   objectives: [],
+  artifactMetadataById: {},
+  missingArtifactIds: [],
   serverRevision: 0,
   lastEventId: 0,
   selectedId: null,
@@ -132,6 +138,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       furniture: cloneLayout(state.initialFurniture),
       wallObjects: cloneWallObjectLayout(state.initialWallObjects),
       objectives: [],
+      artifactMetadataById: {},
+      missingArtifactIds: [],
       serverRevision: 0,
       lastEventId: 0,
       layoutStatus: 'Layout reset',
@@ -230,6 +238,18 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       }
 
       return nextState;
+    });
+  },
+
+  hydrateArtifactMetadata: (response) => {
+    const artifactMetadataById = response.artifacts.reduce<Record<string, Artifact>>((metadataById, artifact) => {
+      metadataById[artifact.id] = { ...artifact };
+      return metadataById;
+    }, {});
+
+    set({
+      artifactMetadataById,
+      missingArtifactIds: [...response.missingIds],
     });
   },
 

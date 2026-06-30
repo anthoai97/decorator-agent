@@ -33,13 +33,18 @@ import type {
 
 interface ImportMatch {
   id: FurnitureId;
-  patch: TransformPatch;
+  patch: LayoutItemImportPatch;
 }
 
 interface WallObjectImportMatch {
   id: WallObjectId;
   position: Partial<WallObjectPosition>;
   wallId?: RoomWallId;
+  artifactId?: string;
+}
+
+interface LayoutItemImportPatch extends TransformPatch {
+  artifactId?: string;
 }
 
 export function createLayoutExport(
@@ -152,6 +157,7 @@ function applyImport(
         rotation: {
           yDegrees: snapDegrees(match.patch.rotation?.yDegrees ?? item.rotation.yDegrees),
         },
+        ...(match.patch.artifactId ? { artifactId: match.patch.artifactId } : {}),
       },
       room,
     );
@@ -169,6 +175,7 @@ function createExportItem(item: FurnitureLayoutItem): LayoutExportItem {
     name: item.name,
     movable: item.movable,
     blocksPlacement: item.blocksPlacement,
+    ...(item.artifactId ? { artifactId: item.artifactId } : {}),
     position: roundVector3(item.position),
     rotation: {
       yDegrees: round(item.rotation.yDegrees, 1),
@@ -184,6 +191,7 @@ function createWallObjectExportItem(item: WallObjectLayoutItem): WallObjectLayou
     name: item.name,
     wallId: item.wallId,
     movable: item.movable,
+    ...(item.artifactId ? { artifactId: item.artifactId } : {}),
     position: {
       u: round(item.position.u),
       y: round(item.position.y),
@@ -304,6 +312,7 @@ function applyWallObjectImport(
       {
         ...item,
         wallId: match.wallId ?? item.wallId,
+        ...(match.artifactId ? { artifactId: match.artifactId } : {}),
         position: {
           ...item.position,
           ...match.position,
@@ -316,10 +325,11 @@ function applyWallObjectImport(
   return nextWallObjects;
 }
 
-function readTransformPatch(item: Record<string, unknown>): TransformPatch {
-  const patch: TransformPatch = {};
+function readTransformPatch(item: Record<string, unknown>): LayoutItemImportPatch {
+  const patch: LayoutItemImportPatch = {};
   const position = readRecord(item.position) ?? readRecord(item.translation);
   const positionPatch = position ? readPositionPatch(position) : undefined;
+  const artifactId = readArtifactId(item.artifactId);
 
   if (positionPatch) {
     patch.position = positionPatch;
@@ -331,15 +341,20 @@ function readTransformPatch(item: Record<string, unknown>): TransformPatch {
     patch.rotation = { yDegrees };
   }
 
+  if (artifactId) {
+    patch.artifactId = artifactId;
+  }
+
   return patch;
 }
 
 function readWallObjectImportPatch(
   item: Record<string, unknown>,
-): Pick<WallObjectImportMatch, 'position' | 'wallId'> | undefined {
+): Pick<WallObjectImportMatch, 'position' | 'wallId' | 'artifactId'> | undefined {
   const position = readRecord(item.position) ?? readRecord(item.translation);
   const wallId = readRoomWallId(item.wallId);
-  const patch: Pick<WallObjectImportMatch, 'position' | 'wallId'> = { position: {} };
+  const artifactId = readArtifactId(item.artifactId);
+  const patch: Pick<WallObjectImportMatch, 'position' | 'wallId' | 'artifactId'> = { position: {} };
 
   const u = position ? readNumber(position.u) : undefined;
   const y = position ? readNumber(position.y) : undefined;
@@ -356,7 +371,11 @@ function readWallObjectImportPatch(
     patch.wallId = wallId;
   }
 
-  return Object.keys(patch.position).length > 0 || patch.wallId ? patch : undefined;
+  if (artifactId) {
+    patch.artifactId = artifactId;
+  }
+
+  return Object.keys(patch.position).length > 0 || patch.wallId || patch.artifactId ? patch : undefined;
 }
 
 function readPositionPatch(position: Record<string, unknown>): Partial<Vector3Data> | undefined {
@@ -456,6 +475,11 @@ function readRoomWallId(value: unknown): RoomWallId | undefined {
   }
 
   return undefined;
+}
+
+function readArtifactId(value: unknown): string | undefined {
+  const token = typeof value === 'string' ? value.trim() : '';
+  return token.length > 0 ? token : undefined;
 }
 
 function readNumber(value: unknown): number | undefined {

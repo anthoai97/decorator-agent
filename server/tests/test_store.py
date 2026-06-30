@@ -5,20 +5,56 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from sqlalchemy import inspect
+from sqlalchemy.engine import Engine
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from server.commands import validate_command
+from server.db import create_sqlite_engine
 from server.events import create_state_event
+from server.schema import SERVER_METADATA
 from server.store import SQLiteStore
 from server.state import create_initial_state
 
 
 class SQLiteStoreTests(unittest.TestCase):
+    def test_sqlalchemy_metadata_initializes_state_tables(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            engine = create_sqlite_engine(Path(directory) / "state.sqlite3")
+
+            try:
+                SERVER_METADATA.create_all(engine)
+                inspector = inspect(engine)
+
+                self.assertLessEqual(
+                    {"current_state", "commands", "events"},
+                    set(inspector.get_table_names()),
+                )
+                self.assertEqual(
+                    {"id", "source", "type", "status", "command_json", "error_message", "created_at"},
+                    {column["name"] for column in inspector.get_columns("commands")},
+                )
+            finally:
+                engine.dispose()
+
     def test_load_state_returns_initial_state_for_empty_store(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = SQLiteStore(Path(directory) / "state.sqlite3")
 
             self.assertEqual(store.load_state(), create_initial_state())
+
+            store.close()
+
+    def test_store_uses_sqlalchemy_engine(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SQLiteStore(Path(directory) / "state.sqlite3")
+
+            self.assertIsInstance(store.engine, Engine)
+            self.assertLessEqual(
+                {"current_state", "commands", "events"},
+                set(inspect(store.engine).get_table_names()),
+            )
 
             store.close()
 
@@ -86,6 +122,21 @@ class SQLiteStoreTests(unittest.TestCase):
 
             store.close()
 
+    def test_load_state_preserves_wall_object_artifact_id(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = SQLiteStore(Path(directory) / "state.sqlite3")
+            command = validate_command({"type": "RESET_LAYOUT", "payload": {}})
+            state = create_initial_state()
+            state["revision"] = 1
+            state["wallObjects"]["wall-art"]["artifactId"] = "seed-wall-art-01"
+            store.record_accepted_command(command, [create_state_event(command, state)], state)
+
+            loaded_state = store.load_state()
+
+            self.assertEqual(loaded_state["wallObjects"]["wall-art"]["artifactId"], "seed-wall-art-01")
+
+            store.close()
+
     def test_load_state_reconciles_legacy_state_with_catalog_defaults(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = SQLiteStore(Path(directory) / "state.sqlite3")
@@ -96,6 +147,7 @@ class SQLiteStoreTests(unittest.TestCase):
             del legacy_state["wallObjects"]
             del legacy_state["furniture"]["rug"]
             del legacy_state["furniture"]["sofa"]["blocksPlacement"]
+            legacy_state["furniture"]["sofa"].pop("artifactId", None)
             store.record_accepted_command(command, [create_state_event(command, legacy_state)], legacy_state)
 
             loaded_state = store.load_state()
@@ -103,6 +155,7 @@ class SQLiteStoreTests(unittest.TestCase):
             self.assertIn("rug", loaded_state["furniture"])
             self.assertFalse(loaded_state["furniture"]["rug"]["blocksPlacement"])
             self.assertTrue(loaded_state["furniture"]["sofa"]["blocksPlacement"])
+            self.assertEqual(loaded_state["furniture"]["sofa"]["artifactId"], "seed-sofa-01")
             self.assertEqual(loaded_state["furniture"]["coffee-table"]["position"]["x"], -2.762)
             self.assertEqual(loaded_state["wallObjects"]["window"]["position"], {"u": -2.1, "y": 1.7})
 

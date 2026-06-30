@@ -16,6 +16,8 @@ import { useRoomStore } from '../../state/useRoomStore';
 
 type Vector3Tuple = [number, number, number];
 
+export const MEASUREMENT_GUIDE_GEOMETRY_SIZE = [1, 1, 1] as const;
+
 interface MeasurementGuide {
   id: string;
   label: string;
@@ -46,8 +48,8 @@ function MeasurementGuides({ guides }: { guides: MeasurementGuide[] }) {
     <group name="Drag measurements">
       {guides.map((guide) => (
         <group key={guide.id}>
-          <mesh position={guide.position} renderOrder={20}>
-            <boxGeometry args={guide.size} />
+          <mesh position={guide.position} scale={createMeasurementGuideMeshProps(guide).scale} renderOrder={20}>
+            <boxGeometry args={MEASUREMENT_GUIDE_GEOMETRY_SIZE} />
             <meshBasicMaterial color="#17202f" transparent opacity={0.84} depthTest={false} toneMapped={false} />
           </mesh>
           <Html
@@ -62,6 +64,13 @@ function MeasurementGuides({ guides }: { guides: MeasurementGuide[] }) {
       ))}
     </group>
   );
+}
+
+export function createMeasurementGuideMeshProps(guide: MeasurementGuide) {
+  return {
+    geometrySize: MEASUREMENT_GUIDE_GEOMETRY_SIZE,
+    scale: guide.size,
+  };
 }
 
 function createFurnitureGuides(item: FurnitureLayoutItem): MeasurementGuide[] {

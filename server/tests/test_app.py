@@ -7,6 +7,7 @@ import threading
 import unittest
 from http.client import HTTPConnection
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -16,6 +17,9 @@ from server.app import (
     create_agent_placeholder_event,
     create_playground_event,
 )
+from server.artifacts import Artifact, ArtifactDimensions
+from server.artifact_store import ArtifactStore
+from server.db import create_sqlite_engine
 
 
 class EventFactoryTests(unittest.TestCase):
@@ -56,6 +60,43 @@ class EventFactoryTests(unittest.TestCase):
 
 
 class ServerLifecycleTests(unittest.TestCase):
+    def test_server_bootstraps_seed_artifacts_next_to_database(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            database_path = Path(tempdir) / "state.sqlite3"
+            server = create_http_server(
+                "127.0.0.1",
+                0,
+                database_path,
+                heartbeat_seconds=0.1,
+            )
+
+            try:
+                runtime_seed = Path(tempdir) / "artifacts" / "models" / "sofa-01.glb"
+
+                self.assertTrue(runtime_seed.exists())
+                self.assertGreater(runtime_seed.stat().st_size, 1_000_000)
+            finally:
+                server.server_close()
+
+    def test_server_seeds_artifact_metadata_into_sqlite(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            database_path = Path(tempdir) / "state.sqlite3"
+            server = create_http_server(
+                "127.0.0.1",
+                0,
+                database_path,
+                heartbeat_seconds=0.1,
+            )
+            server.server_close()
+            engine = create_sqlite_engine(database_path)
+
+            try:
+                artifact = ArtifactStore(engine).get_artifact("seed-sofa-01")
+
+                self.assertEqual(artifact.object_type, "sofa")
+            finally:
+                engine.dispose()
+
     def test_bind_failure_preserves_socket_error(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             server = create_http_server(
@@ -97,13 +138,22 @@ class RequestHandlerTests(unittest.TestCase):
         self.thread.join(timeout=2)
         self.tempdir.cleanup()
 
-    def get_json(self, path: str) -> tuple[int, dict[str, object]]:
+    def get_json(self, path: str, headers: dict[str, str] | None = None) -> tuple[int, dict[str, object]]:
         connection = HTTPConnection(self.host, self.port, timeout=5)
-        connection.request("GET", path)
+        connection.request("GET", path, headers=headers or {})
         response = connection.getresponse()
         body = json.loads(response.read().decode("utf-8"))
         connection.close()
         return response.status, body
+
+    def get_bytes(self, path: str) -> tuple[int, dict[str, str], bytes]:
+        connection = HTTPConnection(self.host, self.port, timeout=5)
+        connection.request("GET", path)
+        response = connection.getresponse()
+        headers = {header: value for header, value in response.getheaders()}
+        body = response.read()
+        connection.close()
+        return response.status, headers, body
 
     def open_get(self, path: str, headers: dict[str, str] | None = None) -> tuple[HTTPConnection, object]:
         connection = HTTPConnection(self.host, self.port, timeout=5)
@@ -199,6 +249,136 @@ class RequestHandlerTests(unittest.TestCase):
         self.assertEqual(len(body["events"]), 1)
         self.assertEqual(body["events"][0]["id"], 2)
 
+    def test_artifact_search_returns_seed_sofa(self) -> None:
+        status, body = self.get_json("/api/artifacts?kind=model3d&type=sofa")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["pagination"], {"page": 1, "pageSize": 24, "totalItems": 1, "totalPages": 1})
+        self.assertEqual(len(body["artifacts"]), 1)
+        artifact = body["artifacts"][0]
+        self.assertEqual(artifact["id"], "seed-sofa-01")
+        self.assertEqual(artifact["kind"], "model3d")
+        self.assertEqual(artifact["objectType"], "sofa")
+        self.assertEqual(artifact["url"], f"http://{self.host}:{self.port}/api/artifacts/seed-sofa-01/content")
+
+    def test_artifact_metadata_ignores_untrusted_host_header(self) -> None:
+        status, body = self.get_json(
+            "/api/artifacts?kind=model3d&type=sofa",
+            headers={"Host": "attacker.example"},
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            body["artifacts"][0]["url"],
+            f"http://{self.host}:{self.port}/api/artifacts/seed-sofa-01/content",
+        )
+
+    def test_artifact_metadata_uses_configured_public_base_url(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            server = create_http_server(
+                "127.0.0.1",
+                0,
+                Path(tempdir) / "state.sqlite3",
+                heartbeat_seconds=0.1,
+                public_base_url="https://assets.example.test/artifacts/",
+            )
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            host, port = server.server_address
+            connection = HTTPConnection(host, port, timeout=5)
+
+            try:
+                connection.request("GET", "/api/artifacts?kind=model3d&type=sofa")
+                response = connection.getresponse()
+                body = json.loads(response.read().decode("utf-8"))
+
+                self.assertEqual(response.status, 200)
+                self.assertEqual(
+                    body["artifacts"][0]["url"],
+                    "https://assets.example.test/artifacts/api/artifacts/seed-sofa-01/content",
+                )
+            finally:
+                connection.close()
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+
+    def test_artifact_routes_read_metadata_from_artifact_store(self) -> None:
+        self.server.artifact_store.seed_artifacts((create_test_table_artifact(),))
+
+        status, body = self.get_json("/api/artifacts?kind=model3d&type=table")
+
+        self.assertEqual(status, 200)
+        self.assertEqual([artifact["id"] for artifact in body["artifacts"]], ["seed-table-01"])
+
+    def test_artifact_search_filters_by_tag_query_param(self) -> None:
+        self.server.artifact_store.seed_artifacts((create_test_table_artifact(),))
+
+        status, body = self.get_json("/api/artifacts?tag=wood")
+
+        self.assertEqual(status, 200)
+        self.assertEqual([artifact["id"] for artifact in body["artifacts"]], ["seed-table-01"])
+
+    def test_artifact_batch_lookup_returns_found_and_missing_ids(self) -> None:
+        status, body = self.get_json("/api/artifacts?ids=missing-a,seed-sofa-01,seed-sofa-01,missing-b")
+
+        self.assertEqual(status, 200)
+        self.assertEqual([artifact["id"] for artifact in body["artifacts"]], ["seed-sofa-01"])
+        self.assertEqual(body["missingIds"], ["missing-a", "missing-b"])
+
+    def test_artifact_batch_lookup_validates_ids(self) -> None:
+        status, body = self.get_json("/api/artifacts?ids=,,")
+
+        self.assertEqual(status, 422)
+        self.assertEqual(body["error"]["code"], "VALIDATION_ERROR")
+        self.assertIn("ids", body["error"]["message"])
+
+    def test_artifact_batch_lookup_rejects_over_max_unique_ids(self) -> None:
+        artifact_ids = ",".join(f"artifact-{index}" for index in range(101))
+
+        status, body = self.get_json(f"/api/artifacts?ids={artifact_ids}")
+
+        self.assertEqual(status, 422)
+        self.assertEqual(body["error"]["code"], "VALIDATION_ERROR")
+        self.assertIn("100", body["error"]["message"])
+
+    def test_artifact_search_validates_pagination(self) -> None:
+        status, body = self.get_json("/api/artifacts?page=0")
+
+        self.assertEqual(status, 422)
+        self.assertEqual(body["error"]["code"], "VALIDATION_ERROR")
+        self.assertIn("page", body["error"]["message"])
+
+    def test_artifact_metadata_endpoint_includes_local_storage_key(self) -> None:
+        status, body = self.get_json("/api/artifacts/seed-sofa-01")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body["artifact"]["id"], "seed-sofa-01")
+        self.assertEqual(body["artifact"]["storageKey"], "models/sofa-01.glb")
+
+    def test_artifact_content_endpoint_serves_seed_glb(self) -> None:
+        status, headers, body = self.get_bytes("/api/artifacts/seed-sofa-01/content")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "model/gltf-binary")
+        self.assertEqual(headers["Cache-Control"], "public, max-age=3600")
+        self.assertEqual(body[:4], b"glTF")
+        self.assertGreater(len(body), 1_000_000)
+
+    def test_artifact_content_endpoint_streams_seed_glb(self) -> None:
+        with patch.object(Path, "read_bytes", side_effect=AssertionError("read_bytes should not be used")):
+            status, headers, body = self.get_bytes("/api/artifacts/seed-sofa-01/content")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "model/gltf-binary")
+        self.assertEqual(body[:4], b"glTF")
+
+    def test_artifact_content_endpoint_returns_not_found_for_unknown_artifact(self) -> None:
+        status, body = self.get_json("/api/artifacts/missing-artifact/content")
+
+        self.assertEqual(status, 404)
+        self.assertEqual(body["error"]["code"], "NOT_FOUND")
+
     def test_sse_stream_honors_last_event_id_header(self) -> None:
         self.post_json("/api/commands", {"type": "RESET_LAYOUT", "payload": {}})
         self.post_json(
@@ -244,10 +424,6 @@ class RequestHandlerTests(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "NOT_FOUND")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 def read_sse_event_frame(response: object) -> list[str]:
     while True:
         frame: list[str] = []
@@ -261,3 +437,23 @@ def read_sse_event_frame(response: object) -> list[str]:
 
         if any(line.startswith("event: ") for line in frame):
             return frame
+
+
+def create_test_table_artifact() -> Artifact:
+    return Artifact(
+        id="seed-table-01",
+        kind="model3d",
+        object_type="table",
+        display_name="Round Wood Table",
+        placement="floor",
+        content_type="model/gltf-binary",
+        storage_key="models/table-01.glb",
+        source="seeded",
+        created_at="2026-06-30T00:00:00Z",
+        tags=("table", "wood", "round"),
+        dimensions_meters=ArtifactDimensions(width=1.2, height=0.72, depth=1.2),
+    )
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
+import { hydrateArtifactsForRoom } from './api/artifactSync';
 import { startServerStateSync } from './api/serverSync';
+import { collectUniqueArtifactIds } from './domain/artifacts';
 import { RoomCanvas } from './scene/RoomCanvas';
 import { useRoomStore } from './state/useRoomStore';
 import { PlaygroundShell } from './ui/PlaygroundShell';
@@ -50,11 +52,38 @@ function ServerStateSync() {
   return null;
 }
 
+function ArtifactMetadataSync() {
+  const furniture = useRoomStore((state) => state.furniture);
+  const wallObjects = useRoomStore((state) => state.wallObjects);
+  const hydrateArtifactMetadata = useRoomStore((state) => state.hydrateArtifactMetadata);
+  const showLayoutStatus = useRoomStore((state) => state.showLayoutStatus);
+  const artifactIdsKey = useMemo(
+    () => collectUniqueArtifactIds({ furniture, wallObjects }).join('|'),
+    [furniture, wallObjects],
+  );
+  const latestArtifactIdsKey = useRef(artifactIdsKey);
+  latestArtifactIdsKey.current = artifactIdsKey;
+
+  useEffect(() => {
+    void hydrateArtifactsForRoom(
+      { furniture, wallObjects },
+      {
+        hydrateArtifactMetadata,
+        isCurrentArtifactRequest: (artifactIds) => latestArtifactIdsKey.current === artifactIds.join('|'),
+        showLayoutStatus,
+      },
+    );
+  }, [artifactIdsKey, hydrateArtifactMetadata, showLayoutStatus]);
+
+  return null;
+}
+
 export function App() {
   return (
     <main id="app">
       <DebugHooks />
       <ServerStateSync />
+      <ArtifactMetadataSync />
       <RoomCanvas />
       <PlaygroundShell />
     </main>

@@ -15,7 +15,7 @@ export const roomDefinition: RoomDefinition = {
 };
 
 export const furnitureCatalog: FurnitureDefinition[] = [
-  { id: 'sofa', name: 'Sofa', movable: true, blocksPlacement: true, defaultPosition: { x: -0.9, y: 0, z: -1.4 }, defaultRotationYDegrees: 0, baseSize: { width: 2.49, height: 1.21, depth: 0.93 } },
+  { id: 'sofa', name: 'Sofa', movable: true, blocksPlacement: true, artifactId: 'seed-sofa-01', defaultPosition: { x: -0.9, y: 0, z: -1.4 }, defaultRotationYDegrees: 0, baseSize: { width: 2.49, height: 1.21, depth: 0.93 } },
   { id: 'coffee-table', name: 'Coffee table', movable: true, blocksPlacement: true, defaultPosition: { x: -0.55, y: 0, z: -0.25 }, defaultRotationYDegrees: 0, baseSize: { width: 1.35, height: 0.628, depth: 0.82 } },
   { id: 'lounge-chair', name: 'Lounge chair', movable: true, blocksPlacement: true, defaultPosition: { x: 1.75, y: 0, z: -0.4 }, defaultRotationYDegrees: -31.5, baseSize: { width: 1.273, height: 1.235, depth: 1.303 } },
   { id: 'bookshelf', name: 'Bookshelf', movable: true, blocksPlacement: true, defaultPosition: { x: 2.15, y: 0, z: -1.75 }, defaultRotationYDegrees: 0, baseSize: { width: 0.92, height: 1.56, depth: 0.34 } },
@@ -34,7 +34,7 @@ function requireCatalogItem(id: FurnitureId): FurnitureDefinition {
 }
 
 function createLayoutItem(item: FurnitureDefinition): FurnitureLayoutItem {
-  return {
+  const layoutItem: FurnitureLayoutItem = {
     id: item.id,
     name: item.name,
     movable: item.movable,
@@ -43,6 +43,12 @@ function createLayoutItem(item: FurnitureDefinition): FurnitureLayoutItem {
     rotation: { yDegrees: snapDegrees(item.defaultRotationYDegrees) },
     baseSize: { ...item.baseSize },
   };
+
+  if (item.artifactId) {
+    layoutItem.artifactId = item.artifactId;
+  }
+
+  return layoutItem;
 }
 
 export function createInitialFurnitureLayout(): FurnitureLayoutMap {

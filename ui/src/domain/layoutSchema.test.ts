@@ -20,9 +20,22 @@ describe('layout schema', () => {
       'planter',
       'rug',
     ]);
+    expect(exported.furniture.find((item) => item.id === 'sofa')?.artifactId).toBe('seed-sofa-01');
     expect(exported.furniture.find((item) => item.id === 'rug')?.blocksPlacement).toBe(false);
     expect(exported.wallObjects?.map((item) => item.id)).toEqual(['window', 'wall-art']);
     expect(exported.wallObjects?.find((item) => item.id === 'wall-art')?.position).toEqual({ u: 1.85, y: 1.55 });
+  });
+
+  it('exports optional wall object artifact ids', () => {
+    const wallObjects = createInitialWallObjectLayout();
+    wallObjects['wall-art'] = {
+      ...wallObjects['wall-art'],
+      artifactId: 'seed-wall-art-01',
+    };
+
+    const exported = createLayoutExport(createInitialFurnitureLayout(), roomDefinition, wallObjects);
+
+    expect(exported.wallObjects?.find((item) => item.id === 'wall-art')?.artifactId).toBe('seed-wall-art-01');
   });
 
   it('imports compact furniture arrays by id', () => {
@@ -164,6 +177,10 @@ describe('layout schema', () => {
   it('imports exported layout data as a round trip', () => {
     const original = createInitialFurnitureLayout();
     const wallObjects = createInitialWallObjectLayout();
+    wallObjects['wall-art'] = {
+      ...wallObjects['wall-art'],
+      artifactId: 'seed-wall-art-01',
+    };
     const exported = createLayoutExport(original, roomDefinition, wallObjects);
     const result = importLayoutFromUnknown(
       exported,
@@ -174,9 +191,11 @@ describe('layout schema', () => {
 
     expect(result.applied).toBe(exported.furniture.length + (exported.wallObjects?.length ?? 0));
     expect(result.layout.sofa.position).toEqual(original.sofa.position);
+    expect(result.layout.sofa.artifactId).toBe('seed-sofa-01');
     expect(result.layout['coffee-table'].position).toEqual(original['coffee-table'].position);
     expect(result.layout['lounge-chair'].rotation.yDegrees).toBe(original['lounge-chair'].rotation.yDegrees);
     expect(result.wallObjects?.window.position).toEqual(wallObjects.window.position);
+    expect(result.wallObjects?.['wall-art'].artifactId).toBe('seed-wall-art-01');
   });
 
   it('imports wall object layout data without changing furniture compatibility', () => {

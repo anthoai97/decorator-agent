@@ -7,19 +7,23 @@ This enables an agent-focused application where manual user actions and future A
 
 ## Assumptions
 1. The app remains a local web application with a Python server and Vite UI.
-2. Python stays dependency-light: standard library HTTP/SSE plus `sqlite3` for persistence.
+2. Python keeps standard library HTTP/SSE transport while SQL persistence uses SQLAlchemy Core.
 3. Server-connected mode is authoritative: the UI does not commit room/objective state locally when `VITE_AGENT_SERVER_URL` is configured.
 4. The existing local-only UI mode can remain as a fallback for development and smoke tests when no server URL is configured.
 5. Multi-user conflict resolution is out of scope for this slice; commands are applied sequentially in server receipt order.
 6. High-frequency pointer movement is not sent through the server. The UI may render local draft movement during drag, but only committed changes are sent to the server.
 
 ## Tech Stack
-- Server: Python 3.13, standard library HTTP server, `sqlite3` persistence.
+- Server: Python 3.13, standard library HTTP server, SQLAlchemy Core-backed SQLite persistence.
 - Package management: Conda environment `server`; Python package execution through `uv`.
 - UI: Vite React app in `ui/`, Zustand as the local projection/cache of server state.
 - Transport:
   - HTTP JSON for commands and state snapshots.
   - SSE for live event delivery and replay after reconnect.
+
+## Persistence Update
+
+As of 2026-06-30, raw `sqlite3` access in the original plan is superseded by ADR-001. Server SQL access should use SQLAlchemy Core across the existing command/event/state store and new artifact metadata. During active development, deleting the local SQLite file under `server/.data` is acceptable; no compatibility migration is required for this refactor.
 
 ## Commands
 - Server tests: `cd server && conda run -n server uv run --python 3.13 python -m unittest discover -s tests`
@@ -37,7 +41,7 @@ server/
     commands.py         # Command validation and execution
     events.py           # Event creation, SSE formatting, subscriber fanout
     state.py            # Server-owned playground state model and mutations
-    store.py            # SQLite persistence for state, commands, and events
+    store.py            # SQLAlchemy Core-backed persistence for state, commands, and events
   tests/
     test_commands.py
     test_events.py
@@ -232,7 +236,7 @@ await sendCommand({
 - Server unit tests:
   - command validation,
   - state mutation and collision rejection,
-  - SQLite persistence and replay,
+  - SQLAlchemy-backed SQLite persistence and replay,
   - SSE formatting and replay ordering.
 - Server integration tests:
   - `GET /api/state`,
@@ -280,7 +284,7 @@ await sendCommand({
 - Server tests, UI tests, UI build, and smoke verification pass.
 
 ## Open Questions
-- Should the SQLite database live at `server/data/playground.sqlite3` by default, or under a configurable env var only?
+- Should the SQLite database path remain `.data/playground.sqlite3` by default, or move behind a configurable env var?
 - Should local-only UI fallback remain permanently, or only until server mode is stable?
 - What object count should trigger replacing all-pairs collision checks with a spatial index?
 - Should drag preview show a "pending server validation" state after pointer release?

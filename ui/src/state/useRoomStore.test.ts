@@ -200,4 +200,29 @@ describe('useRoomStore', () => {
     expect(useRoomStore.getState().furniture.planter).toBeUndefined();
     expect(useRoomStore.getState().selectedId).toBeNull();
   });
+
+  it('hydrates artifact metadata separately from room placement state', () => {
+    const furnitureBefore = useRoomStore.getState().furniture;
+
+    useRoomStore.getState().hydrateArtifactMetadata({
+      artifacts: [
+        {
+          id: 'seed-sofa-01',
+          kind: 'model3d',
+          objectType: 'sofa',
+          displayName: 'Sofa',
+          placement: 'floor',
+          contentType: 'model/gltf-binary',
+          url: 'http://127.0.0.1:8787/api/artifacts/seed-sofa-01/content',
+          thumbnailUrl: null,
+          tags: ['sofa'],
+        },
+      ],
+      missingIds: ['missing-artifact'],
+    });
+
+    expect(useRoomStore.getState().artifactMetadataById['seed-sofa-01'].objectType).toBe('sofa');
+    expect(useRoomStore.getState().missingArtifactIds).toEqual(['missing-artifact']);
+    expect(useRoomStore.getState().furniture).toBe(furnitureBefore);
+  });
 });

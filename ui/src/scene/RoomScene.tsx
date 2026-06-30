@@ -1,10 +1,12 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 import { sendServerCommand } from '../api/serverEvents';
 import { roomDefinition } from '../data/furnitureCatalog';
+import { readArtifactUrlForItem } from '../domain/artifacts';
+import type { RoomWallId } from '../domain/types';
 import { useRoomStore } from '../state/useRoomStore';
 import { Bookshelf } from './components/Bookshelf';
 import { CoffeeTable } from './components/CoffeeTable';
@@ -27,7 +29,6 @@ import {
   type OpenWallIds,
   TOP_VIEW_CAMERA_POSITION,
 } from './roomView';
-import type { RoomWallId } from '../domain/types';
 
 const allWallIds: RoomWallId[] = ['front', 'back', 'left', 'right'];
 
@@ -41,6 +42,7 @@ export function RoomScene() {
   );
   const openWallIdsRef = useRef(openWallIds);
   const furniture = useRoomStore((state) => state.furniture);
+  const artifactMetadataById = useRoomStore((state) => state.artifactMetadataById);
   const selectFurniture = useRoomStore((state) => state.selectFurniture);
   const showLayoutStatus = useRoomStore((state) => state.showLayoutStatus);
   const cameraMode = useRoomStore((state) => state.cameraMode);
@@ -50,6 +52,7 @@ export function RoomScene() {
     () => allWallIds.filter((wallId) => !openWallIds.includes(wallId)),
     [openWallIds],
   );
+  const sofaModelUrl = readArtifactUrlForItem(furniture.sofa, artifactMetadataById);
 
   const setControlsEnabled = useCallback((enabled: boolean) => {
     if (controlsRef.current) {
@@ -156,9 +159,7 @@ export function RoomScene() {
       <group onPointerMissed={() => selectFurniture(null)}>
         {furniture.sofa ? (
           <FurnitureItem item={furniture.sofa} drag={drag}>
-            <Suspense fallback={null}>
-              <Sofa />
-            </Suspense>
+            <Sofa modelUrl={sofaModelUrl} />
           </FurnitureItem>
         ) : null}
         {furniture['coffee-table'] ? (
