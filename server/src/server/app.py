@@ -25,7 +25,12 @@ from server.executor import CommandExecutor
 from server.store import SQLiteStore
 
 JsonObject = dict[str, Any]
+QueryParams = dict[str, list[str]]
 ARTIFACT_STREAM_CHUNK_BYTES = 1024 * 1024
+DEFAULT_ARTIFACT_PAGE_SIZE = 24
+MAX_ARTIFACT_IDS_PER_BATCH = 100
+MAX_ARTIFACT_PAGE_SIZE = 100
+POST_ROUTES = frozenset({"/api/commands", "/api/playground/commands", "/api/agent/runs"})
 
 
 def create_playground_event(command: JsonObject) -> JsonObject:
@@ -112,37 +117,24 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.write_sse_stream(since_id)
             return
 
-        self.write_json({"error": {"code": "NOT_FOUND", "message": "Route not found"}}, HTTPStatus.NOT_FOUND)
+        self.write_not_found()
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
 
-        if path not in {"/api/commands", "/api/playground/commands", "/api/agent/runs"}:
-            self.write_json({"error": {"code": "NOT_FOUND", "message": "Route not found"}}, HTTPStatus.NOT_FOUND)
+        if path not in POST_ROUTES:
+            self.write_not_found()
             return
 
         try:
             body = self.read_json_body()
 
             if path == "/api/commands":
-                result = self.playground_server.executor.execute_command(body)
-                self.publish_result_events(result)
-                self.write_command_result(result)
+                self.write_command_response(body)
                 return
 
             if path == "/api/playground/commands":
-                result = self.playground_server.executor.execute_command(body)
-                self.publish_result_events(result)
-                if not result["accepted"]:
-                    self.write_command_result(result)
-                    return
-
-                self.write_json(
-                    {
-                        "event": create_playground_compatibility_event(result),
-                        "result": result,
-                    }
-                )
+                self.write_playground_command_response(body)
                 return
 
             if path == "/api/agent/runs":
@@ -151,6 +143,29 @@ class RequestHandler(BaseHTTPRequestHandler):
 
         except ValueError as error:
             self.write_validation_error(error)
+
+    def write_command_response(self, body: JsonObject) -> None:
+        result = self.execute_and_publish_command(body)
+        self.write_command_result(result)
+
+    def write_playground_command_response(self, body: JsonObject) -> None:
+        result = self.execute_and_publish_command(body)
+
+        if not result["accepted"]:
+            self.write_command_result(result)
+            return
+
+        self.write_json(
+            {
+                "event": create_playground_compatibility_event(result),
+                "result": result,
+            }
+        )
+
+    def execute_and_publish_command(self, body: JsonObject) -> JsonObject:
+        result = self.playground_server.executor.execute_command(body)
+        self.publish_result_events(result)
+        return result
 
     def read_json_body(self) -> JsonObject:
         content_length = int(self.headers.get("Content-Length", "0"))
@@ -183,23 +198,29 @@ class RequestHandler(BaseHTTPRequestHandler):
         base_url = self.read_base_url()
 
         if "ids" in params:
-            artifact_ids = parse_artifact_ids(read_query_value(params, "ids", ""))
-            if len(artifact_ids) > 100:
-                raise ValueError("ids must include no more than 100 unique artifact ids")
-
-            batch_result = self.playground_server.artifact_store.get_artifacts_by_ids(artifact_ids)
-
-            self.write_json(
-                {
-                    "artifacts": [artifact_to_metadata(artifact, base_url) for artifact in batch_result.artifacts],
-                    "missingIds": batch_result.missing_ids,
-                }
-            )
+            self.write_artifact_batch_collection(params, base_url)
             return
 
+        self.write_artifact_search_collection(params, base_url)
+
+    def write_artifact_batch_collection(self, params: QueryParams, base_url: str) -> None:
+        artifact_ids = parse_artifact_ids(read_query_value(params, "ids", ""))
+        if len(artifact_ids) > MAX_ARTIFACT_IDS_PER_BATCH:
+            raise ValueError("ids must include no more than 100 unique artifact ids")
+
+        batch_result = self.playground_server.artifact_store.get_artifacts_by_ids(artifact_ids)
+
+        self.write_json(
+            {
+                "artifacts": [artifact_to_metadata(artifact, base_url) for artifact in batch_result.artifacts],
+                "missingIds": batch_result.missing_ids,
+            }
+        )
+
+    def write_artifact_search_collection(self, params: QueryParams, base_url: str) -> None:
         page = read_positive_query_int(params, "page", 1)
-        page_size = read_positive_query_int(params, "pageSize", 24)
-        if page_size > 100:
+        page_size = read_positive_query_int(params, "pageSize", DEFAULT_ARTIFACT_PAGE_SIZE)
+        if page_size > MAX_ARTIFACT_PAGE_SIZE:
             raise ValueError("pageSize must be no greater than 100")
 
         object_type = read_query_value(params, "objectType", "") or read_query_value(params, "type", "")
@@ -236,13 +257,13 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.write_artifact_content(parts[2])
             return
 
-        self.write_json({"error": {"code": "NOT_FOUND", "message": "Route not found"}}, HTTPStatus.NOT_FOUND)
+        self.write_not_found()
 
     def write_artifact_metadata(self, artifact_id: str) -> None:
         try:
             artifact = self.playground_server.artifact_store.get_artifact(artifact_id)
-        except ArtifactNotFoundError as error:
-            self.write_json(error.to_error_payload(), HTTPStatus.NOT_FOUND)
+        except ArtifactNotFoundError:
+            self.write_artifact_not_found()
             return
 
         self.write_json({"artifact": artifact_to_metadata(artifact, self.read_base_url(), include_storage_key=True)})
@@ -250,20 +271,24 @@ class RequestHandler(BaseHTTPRequestHandler):
     def write_artifact_content(self, artifact_id: str) -> None:
         try:
             artifact = self.playground_server.artifact_store.get_artifact(artifact_id)
-            artifact_path = resolve_artifact_path(self.playground_server.artifact_root, artifact.storage_key)
-        except (ArtifactNotFoundError, ValueError) as error:
-            if isinstance(error, ArtifactNotFoundError):
-                self.write_json(error.to_error_payload(), HTTPStatus.NOT_FOUND)
-                return
+        except ArtifactNotFoundError:
+            self.write_artifact_not_found()
+            return
 
-            self.write_json({"error": {"code": "NOT_FOUND", "message": "Artifact not found"}}, HTTPStatus.NOT_FOUND)
+        try:
+            artifact_path = resolve_artifact_path(self.playground_server.artifact_root, artifact.storage_key)
+        except ValueError:
+            self.write_artifact_not_found()
             return
 
         if not artifact_path.is_file():
-            self.write_json({"error": {"code": "NOT_FOUND", "message": "Artifact not found"}}, HTTPStatus.NOT_FOUND)
+            self.write_artifact_not_found()
             return
 
         self.write_binary_file(artifact_path, artifact.content_type)
+
+    def write_artifact_not_found(self) -> None:
+        self.write_not_found("Artifact not found")
 
     def write_binary_file(self, path: Path, content_type: str) -> None:
         content_length = path.stat().st_size
@@ -309,9 +334,15 @@ class RequestHandler(BaseHTTPRequestHandler):
         )
 
     def write_validation_error(self, error: ValueError) -> None:
+        self.write_error("VALIDATION_ERROR", str(error), HTTPStatus.UNPROCESSABLE_ENTITY)
+
+    def write_not_found(self, message: str = "Route not found") -> None:
+        self.write_error("NOT_FOUND", message, HTTPStatus.NOT_FOUND)
+
+    def write_error(self, code: str, message: str, status: HTTPStatus) -> None:
         self.write_json(
-            {"error": {"code": "VALIDATION_ERROR", "message": str(error)}},
-            HTTPStatus.UNPROCESSABLE_ENTITY,
+            {"error": {"code": code, "message": message}},
+            status,
         )
 
     def write_sse_stream(self, since_id: int) -> None:
