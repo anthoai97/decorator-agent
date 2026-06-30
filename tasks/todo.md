@@ -39,7 +39,7 @@
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 4
 
-- [ ] Checkpoint: State and events review
+- [x] Checkpoint: State and events review
   - Verify: `cd ui && npm test`
 
 ## Phase 3: Artifact API
