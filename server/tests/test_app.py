@@ -235,6 +235,116 @@ def test_create_app_allows_local_cors_preflight(fastapi_client: TestClient) -> N
     assert "GET" in response.headers["access-control-allow-methods"]
 
 
+def test_fastapi_command_endpoint_executes_command(fastapi_client: TestClient) -> None:
+    response = fastapi_client.post(
+        "/api/commands",
+        json={
+            "type": "MOVE_FURNITURE",
+            "payload": {"furnitureId": "coffee-table", "position": {"x": 1.2, "z": 1.6}},
+        },
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["result"]["accepted"] is True
+    assert body["result"]["revision"] == 1
+    assert body["result"]["events"][0]["id"] == 1
+
+    state_body = fastapi_client.get("/api/state").json()
+    assert state_body["state"]["furniture"]["coffee-table"]["position"]["x"] == 1.2
+
+
+def test_fastapi_command_endpoint_executes_wall_object_move(fastapi_client: TestClient) -> None:
+    response = fastapi_client.post(
+        "/api/commands",
+        json={
+            "type": "MOVE_WALL_OBJECT",
+            "payload": {"wallObjectId": "window", "wallId": "left", "position": {"u": 0.5, "y": 1.4}},
+        },
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["result"]["accepted"] is True
+    assert body["result"]["events"][0]["patch"]["wallObjects"]["window"]["wallId"] == "left"
+    assert body["result"]["events"][0]["patch"]["wallObjects"]["window"]["position"] == {"u": 0.5, "y": 1.4}
+
+    state_body = fastapi_client.get("/api/state").json()
+    assert state_body["state"]["wallObjects"]["window"]["wallId"] == "left"
+    assert state_body["state"]["wallObjects"]["window"]["position"] == {"u": 0.5, "y": 1.4}
+
+
+def test_fastapi_command_endpoint_persists_and_publishes_events(fastapi_client: TestClient) -> None:
+    services = fastapi_client.app.state.services
+    subscriber = services.broker.subscribe()
+
+    try:
+        response = fastapi_client.post("/api/commands", json={"type": "RESET_LAYOUT", "payload": {}})
+        event = subscriber.get(timeout=1)
+    finally:
+        services.broker.unsubscribe(subscriber)
+
+    commands = services.store.list_commands_after(0)
+
+    assert response.status_code == 200
+    assert commands[0]["status"] == "accepted"
+    assert event["type"] == "room.state.snapshot"
+
+
+def test_fastapi_playground_command_endpoint_returns_event(fastapi_client: TestClient) -> None:
+    response = fastapi_client.post("/api/playground/commands", json={"type": "RESET_LAYOUT", "payload": {}})
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["event"]["type"] == "playground.command.accepted"
+    assert body["event"]["command"]["type"] == "RESET_LAYOUT"
+    assert body["result"]["accepted"] is True
+
+
+def test_fastapi_playground_command_endpoint_validates_payload_shape(fastapi_client: TestClient) -> None:
+    response = fastapi_client.post("/api/playground/commands", json={"type": "RESET_LAYOUT", "payload": "bad"})
+    body = response.json()
+
+    assert response.status_code == 422
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["result"]["accepted"] is False
+    assert body["result"]["events"][0]["type"] == "command.rejected"
+    assert fastapi_client.app.state.services.store.list_commands_after(0)[0]["status"] == "rejected"
+
+
+def test_fastapi_command_endpoint_validates_json_body(fastapi_client: TestClient) -> None:
+    response = fastapi_client.post(
+        "/api/commands",
+        content="{bad json",
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {"code": "VALIDATION_ERROR", "message": "Request body must be valid JSON"}
+    }
+
+
+def test_fastapi_command_endpoint_validates_object_body(fastapi_client: TestClient) -> None:
+    response = fastapi_client.post("/api/commands", json=[])
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {"code": "VALIDATION_ERROR", "message": "Request body must be a JSON object"}
+    }
+
+
+def test_fastapi_unknown_post_route_returns_not_found_before_json_validation(fastapi_client: TestClient) -> None:
+    response = fastapi_client.post(
+        "/api/unknown",
+        content="{bad json",
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"error": {"code": "NOT_FOUND", "message": "Route not found"}}
+
+
 class RequestHandlerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()

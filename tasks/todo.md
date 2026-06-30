@@ -29,7 +29,7 @@
 
 ## Phase 2: State Mutation and Events
 
-- [ ] Task 4: Migrate command routes
+- [x] Task 4: Migrate command routes
   - Acceptance: `/api/commands` and `/api/playground/commands` preserve accepted/rejected envelopes and persist command/event rows.
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 3
