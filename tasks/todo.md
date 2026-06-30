@@ -49,7 +49,7 @@
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 3
 
-- [ ] Task 7: Migrate artifact metadata and content streaming
+- [x] Task 7: Migrate artifact metadata and content streaming
   - Acceptance: metadata includes `storageKey`, missing artifacts return `NOT_FOUND`, content headers are preserved, and GLB responses stream.
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 6

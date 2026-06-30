@@ -527,6 +527,43 @@ def test_fastapi_artifact_metadata_uses_configured_public_base_url(temp_database
     )
 
 
+def test_fastapi_artifact_metadata_endpoint_includes_local_storage_key(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/artifacts/seed-sofa-01")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["artifact"]["id"] == "seed-sofa-01"
+    assert body["artifact"]["storageKey"] == "models/sofa-01.glb"
+
+
+def test_fastapi_artifact_content_endpoint_serves_seed_glb(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/artifacts/seed-sofa-01/content")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "model/gltf-binary"
+    assert response.headers["cache-control"] == "public, max-age=3600"
+    assert response.content[:4] == b"glTF"
+    assert len(response.content) > 1_000_000
+
+
+def test_fastapi_artifact_content_endpoint_streams_seed_glb(fastapi_client: TestClient) -> None:
+    with patch.object(Path, "read_bytes", side_effect=AssertionError("read_bytes should not be used")):
+        response = fastapi_client.get("/api/artifacts/seed-sofa-01/content")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "model/gltf-binary"
+    assert response.content[:4] == b"glTF"
+
+
+def test_fastapi_artifact_content_endpoint_returns_not_found_for_unknown_artifact(
+    fastapi_client: TestClient,
+) -> None:
+    response = fastapi_client.get("/api/artifacts/missing-artifact/content")
+
+    assert response.status_code == 404
+    assert response.json() == {"error": {"code": "NOT_FOUND", "message": "Artifact not found"}}
+
+
 class RequestHandlerTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory()

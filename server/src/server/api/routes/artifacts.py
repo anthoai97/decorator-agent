@@ -1,19 +1,22 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from server.artifacts import artifact_to_metadata
+from server.artifacts import ArtifactNotFoundError, artifact_to_metadata, resolve_artifact_path
 from server.api.dependencies import get_services
 from server.api.errors import error_payload
 
 MAX_ARTIFACT_IDS_PER_BATCH = 100
 DEFAULT_ARTIFACT_PAGE_SIZE = 24
 MAX_ARTIFACT_PAGE_SIZE = 100
+ARTIFACT_STREAM_CHUNK_BYTES = 1024 * 1024
 
 router = APIRouter(prefix="/api", tags=["artifacts"])
 
@@ -51,6 +54,45 @@ def get_artifacts(
         )
     except ValueError as error:
         return validation_error_response(str(error))
+
+
+@router.get("/artifacts/{artifact_id}")
+def get_artifact_metadata(artifact_id: str, request: Request, services: Any = Depends(get_services)) -> JSONResponse:
+    try:
+        artifact = services.artifact_store.get_artifact(artifact_id)
+    except ArtifactNotFoundError:
+        return artifact_not_found_response()
+
+    return JSONResponse(
+        {
+            "artifact": artifact_to_metadata(
+                artifact,
+                read_base_url(request, services),
+                include_storage_key=True,
+            )
+        }
+    )
+
+
+@router.get("/artifacts/{artifact_id}/content")
+def get_artifact_content(artifact_id: str, services: Any = Depends(get_services)) -> Response:
+    try:
+        artifact = services.artifact_store.get_artifact(artifact_id)
+        artifact_path = resolve_artifact_path(services.artifact_root, artifact.storage_key)
+    except (ArtifactNotFoundError, ValueError):
+        return artifact_not_found_response()
+
+    if not artifact_path.is_file():
+        return artifact_not_found_response()
+
+    return StreamingResponse(
+        stream_file(artifact_path),
+        media_type=artifact.content_type,
+        headers={
+            "Content-Length": str(artifact_path.stat().st_size),
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
 
 
 def artifact_batch_response(ids: str, base_url: str, services: Any) -> JSONResponse:
@@ -211,3 +253,16 @@ def validation_error_response(message: str) -> JSONResponse:
         error_payload("VALIDATION_ERROR", message),
         status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
     )
+
+
+def artifact_not_found_response() -> JSONResponse:
+    return JSONResponse(
+        error_payload("NOT_FOUND", "Artifact not found"),
+        status_code=HTTPStatus.NOT_FOUND,
+    )
+
+
+def stream_file(path: Path) -> Iterator[bytes]:
+    with path.open("rb") as artifact_file:
+        while chunk := artifact_file.read(ARTIFACT_STREAM_CHUNK_BYTES):
+            yield chunk
