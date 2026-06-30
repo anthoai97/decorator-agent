@@ -2,10 +2,10 @@
 
 ## Planning Assumptions To Confirm
 
-- [ ] Behavior-preserving migration only; no new API capabilities in this pass.
-- [ ] `/api/agent/runs` remains a placeholder.
-- [ ] CORS remains permissive for local development.
-- [ ] Runtime `/docs` and `/openapi.json` are enough; no generated OpenAPI artifact is committed.
+- [x] Behavior-preserving migration only; no new API capabilities in this pass.
+- [x] `/api/agent/runs` remains a placeholder.
+- [x] CORS remains permissive for local development.
+- [x] Runtime `/docs` and `/openapi.json` are enough; no generated OpenAPI artifact is committed.
 
 ## Phase 1: ASGI Foundation
 
