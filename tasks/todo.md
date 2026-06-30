@@ -64,7 +64,7 @@
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Tasks 4 and 7
 
-- [ ] Task 9: Verify tooling, Docker, README, and smoke stack
+- [x] Task 9: Verify tooling, Docker, README, and smoke stack
   - Acceptance: local server command, Docker Compose, README, backend tests, UI tests, and smoke stack all align with FastAPI.
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Verify: `cd ui && npm test`

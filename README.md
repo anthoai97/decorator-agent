@@ -19,7 +19,10 @@ Useful checks:
 ```bash
 curl -sk http://127.0.0.1:8787/health
 curl -sk http://127.0.0.1:8787/api/state
+curl -sk http://127.0.0.1:8787/openapi.json
 ```
+
+FastAPI docs are available at `http://127.0.0.1:8787/docs`.
 
 Stop the app:
 
@@ -55,6 +58,22 @@ Then open:
 
 ```text
 http://127.0.0.1:5173
+```
+
+## Test
+
+Backend:
+
+```bash
+cd server
+uv run --python 3.13 pytest
+```
+
+UI:
+
+```bash
+cd ui
+npm test
 ```
 
 ## Smoke Test
