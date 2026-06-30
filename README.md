@@ -56,3 +56,22 @@ Then open:
 ```text
 http://127.0.0.1:5173
 ```
+
+## Smoke Test
+
+Run the full local smoke stack with one command:
+
+```bash
+cd ui
+npm run smoke
+```
+
+By default this starts the Python server on `127.0.0.1:8799`, starts Vite on
+`127.0.0.1:5179`, runs the browser smoke test, then stops both processes.
+
+To smoke test an already running UI instead:
+
+```bash
+cd ui
+SMOKE_URL=http://127.0.0.1:5173 npm run smoke
+```
