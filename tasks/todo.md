@@ -34,7 +34,7 @@
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 3
 
-- [ ] Task 5: Migrate event history and SSE routes
+- [x] Task 5: Migrate event history and SSE routes
   - Acceptance: event history, `since`, `Last-Event-ID`, live SSE delivery, heartbeat, and unsubscribe cleanup are preserved.
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 4

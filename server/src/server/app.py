@@ -29,7 +29,7 @@ from server.commands import validate_command
 from server.events import EventBroker, format_sse_comment, format_sse_event
 from server.executor import CommandExecutor
 from server.api.errors import register_error_handlers
-from server.api.routes import commands, state
+from server.api.routes import commands, events, state
 from server.store import SQLiteStore
 
 JsonObject = dict[str, Any]
@@ -111,6 +111,7 @@ def create_app(
 
     app.include_router(state.router)
     app.include_router(commands.router)
+    app.include_router(events.router)
 
     return app
 

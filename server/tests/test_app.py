@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 import tempfile
@@ -343,6 +344,103 @@ def test_fastapi_unknown_post_route_returns_not_found_before_json_validation(fas
 
     assert response.status_code == 404
     assert response.json() == {"error": {"code": "NOT_FOUND", "message": "Route not found"}}
+
+
+def test_fastapi_events_history_endpoint_returns_persisted_events_after_id(fastapi_client: TestClient) -> None:
+    fastapi_client.post("/api/commands", json={"type": "RESET_LAYOUT", "payload": {}})
+    fastapi_client.post(
+        "/api/commands",
+        json={
+            "type": "SET_FURNITURE_ROTATION",
+            "payload": {"furnitureId": "planter", "rotationYDegrees": 45},
+        },
+    )
+
+    response = fastapi_client.get("/api/events/history?after=1")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["lastEventId"] == 2
+    assert len(body["events"]) == 1
+    assert body["events"][0]["id"] == 2
+
+
+def test_fastapi_events_history_validates_after_id(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/events/history?after=-1")
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {"code": "VALIDATION_ERROR", "message": "after must be a non-negative integer"}
+    }
+
+
+def test_fastapi_events_route_validates_since_id(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/events?since=bad")
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {"code": "VALIDATION_ERROR", "message": "since must be a non-negative integer"}
+    }
+
+
+def test_fastapi_events_route_validates_last_event_id(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/events", headers={"Last-Event-ID": "-1"})
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {"code": "VALIDATION_ERROR", "message": "Last-Event-ID must be a non-negative integer"}
+    }
+
+
+def test_fastapi_events_stream_replays_missed_events_from_last_event_id(fastapi_client: TestClient) -> None:
+    from server.api.routes.events import event_stream
+
+    fastapi_client.post("/api/commands", json={"type": "RESET_LAYOUT", "payload": {}})
+    fastapi_client.post(
+        "/api/commands",
+        json={
+            "type": "SET_FURNITURE_ROTATION",
+            "payload": {"furnitureId": "planter", "rotationYDegrees": 45},
+        },
+    )
+
+    async def read_replayed_event() -> bytes:
+        stream = event_stream(fastapi_client.app.state.services, since_id=1)
+        try:
+            return await anext(stream)
+        finally:
+            await stream.aclose()
+
+    frame = asyncio.run(read_replayed_event()).decode("utf-8")
+
+    assert "id: 2" in frame
+    assert "event: room.state.patch" in frame
+
+
+def test_fastapi_events_stream_receives_live_command_events(fastapi_client: TestClient) -> None:
+    from server.api.routes.events import event_stream
+
+    async def read_live_event() -> bytes:
+        stream = event_stream(fastapi_client.app.state.services, since_id=0)
+
+        async def next_event_frame() -> bytes:
+            while True:
+                frame = await anext(stream)
+                if not frame.startswith(b": "):
+                    return frame
+
+        try:
+            read_task = asyncio.create_task(next_event_frame())
+            await asyncio.sleep(0.01)
+            fastapi_client.post("/api/commands", json={"type": "RESET_LAYOUT", "payload": {}})
+            return await asyncio.wait_for(read_task, timeout=1)
+        finally:
+            await stream.aclose()
+
+    frame = asyncio.run(read_live_event()).decode("utf-8")
+
+    assert "id: 1" in frame
+    assert "event: room.state.snapshot" in frame
 
 
 class RequestHandlerTests(unittest.TestCase):
