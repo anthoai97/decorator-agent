@@ -36,6 +36,7 @@ class StateModelTests(unittest.TestCase):
         self.assertEqual(sofa["position"], {"x": -0.9, "y": 0, "z": -1.4})
         self.assertEqual(sofa["rotation"], {"yDegrees": 0})
         self.assertEqual(sofa["baseSize"], {"width": 2.49, "height": 1.21, "depth": 0.93})
+        self.assertEqual(sofa["artifactId"], "seed-sofa-01")
 
     def test_initial_state_includes_movable_non_blocking_area_rug(self) -> None:
         rug = create_initial_state()["furniture"]["rug"]

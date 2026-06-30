@@ -29,7 +29,7 @@ try {
 
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => {
-      if (message.type() === 'error') {
+      if (message.type() === 'error' || isWebGpuValidationWarning(message.text())) {
         errors.push(message.text());
       }
     });
@@ -384,6 +384,13 @@ function assertWallObjectMoveCommandForSmoke(postedCommands, viewport) {
       `${viewport.name}: MOVE_WALL_OBJECT payload shape was invalid: ${JSON.stringify(wallObjectMove)}`,
     );
   }
+}
+
+function isWebGpuValidationWarning(message) {
+  return (
+    /Vertex buffer slot \d+ required by .* was not set/.test(message) ||
+    /Invalid CommandBuffer .* invalid due to a previous error/.test(message)
+  );
 }
 
 function analyzePng(buffer) {

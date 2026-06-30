@@ -40,6 +40,7 @@ export interface FurnitureDefinition {
   name: string;
   movable: boolean;
   blocksPlacement: boolean;
+  artifactId?: string;
   defaultPosition: Vector3Data;
   defaultRotationYDegrees: number;
   baseSize: Size3Data;
@@ -50,6 +51,7 @@ export interface FurnitureLayoutItem {
   name: string;
   movable: boolean;
   blocksPlacement: boolean;
+  artifactId?: string;
   position: Vector3Data;
   rotation: { yDegrees: number };
   baseSize: Size3Data;
@@ -72,6 +74,7 @@ export interface WallObjectDefinition {
   name: string;
   wallId: RoomWallId;
   movable: boolean;
+  artifactId?: string;
   defaultPosition: WallObjectPosition;
   size: Size3Data;
   normalOffset: number;
@@ -82,6 +85,7 @@ export interface WallObjectLayoutItem {
   name: string;
   wallId: RoomWallId;
   movable: boolean;
+  artifactId?: string;
   position: WallObjectPosition;
   size: Size3Data;
   normalOffset: number;
@@ -117,6 +121,7 @@ export interface LayoutExportItem {
   name: string;
   movable: boolean;
   blocksPlacement: boolean;
+  artifactId?: string;
   position: Vector3Data;
   rotation: {
     yDegrees: number;
@@ -130,6 +135,7 @@ export interface WallObjectLayoutExportItem {
   name: string;
   wallId: RoomWallId;
   movable: boolean;
+  artifactId?: string;
   position: WallObjectPosition;
   size: Size3Data;
 }

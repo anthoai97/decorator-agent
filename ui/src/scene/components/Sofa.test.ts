@@ -1,15 +1,14 @@
 import { readFileSync, statSync } from 'node:fs';
 
-import { describe, expect, it } from 'vitest';
+import { Suspense } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  SOFA_INTERACTION_BOUNDS,
-  SOFA_MODEL_TRANSFORM,
-  SOFA_MODEL_URL,
-  SOFA_USE_DRACO,
-  SOFA_USE_MESHOPT,
-  getScaledSofaModelSize,
-} from './Sofa';
+let sofaModule: Awaited<typeof import('./Sofa')>;
+
+type ReactElementLike = {
+  type?: unknown;
+  props?: Record<string, unknown>;
+};
 
 type GlbJson = {
   bufferViews?: { byteLength: number }[];
@@ -18,16 +17,51 @@ type GlbJson = {
 };
 
 const GLB_JSON_CHUNK_TYPE = 0x4e4f534a;
-const SOFA_ASSET_URL = new URL('../../../public/assets/models/sofa-01.glb', import.meta.url);
+const SOFA_ASSET_URL = new URL('../../../../server/assets/seeds/models/sofa-01.glb', import.meta.url);
 
 describe('Sofa model contract', () => {
-  it('uses the supplied sofa GLB from public assets', () => {
-    expect(SOFA_MODEL_URL).toBe('/assets/models/sofa-01.glb');
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    sofaModule = await import('./Sofa');
+  });
+
+  it('does not resolve a server URL at module import time', () => {
+    expect(sofaModule.SOFA_ARTIFACT_ID).toBe('seed-sofa-01');
+  });
+
+  it('renders the sofa model from a server-provided artifact URL', () => {
+    const modelUrl = 'http://127.0.0.1:8787/api/artifacts/seed-sofa-01/content';
+    const sofaElement = sofaModule.Sofa({ modelUrl }) as ReactElementLike;
+    const modelArtifact = findModelArtifactChild(sofaElement);
+
+    expect(modelArtifact?.props?.url).toBe(modelUrl);
+  });
+
+  it('keeps the interaction fallback when the server model URL is unavailable', () => {
+    const sofaElement = sofaModule.Sofa({}) as ReactElementLike;
+
+    expect(findModelArtifactChild(sofaElement)).toBeUndefined();
+  });
+
+  it('keeps interaction bounds outside the model suspense boundary', () => {
+    const sofaElement = sofaModule.Sofa({
+      modelUrl: 'http://127.0.0.1:8787/api/artifacts/seed-sofa-01/content',
+    }) as ReactElementLike;
+    const directChildren = readElementChildren(sofaElement);
+    const interactionBounds = directChildren.find(
+      (child) => child.type === 'mesh' && child.props?.name === 'Sofa interaction bounds',
+    );
+    const modelBoundary = directChildren.find((child) => child.type === Suspense);
+
+    expect(interactionBounds).toBeDefined();
+    expect(modelBoundary).toBeDefined();
+    expect(findModelArtifactChild(modelBoundary)).toBeDefined();
   });
 
   it('loads the compressed sofa with Meshopt and no Draco decoder', () => {
-    expect(SOFA_USE_DRACO).toBe(false);
-    expect(SOFA_USE_MESHOPT).toBe(true);
+    expect(sofaModule.SOFA_USE_DRACO).toBe(false);
+    expect(sofaModule.SOFA_USE_MESHOPT).toBe(true);
   });
 
   it('keeps the balanced Meshopt asset with source-quality textures', () => {
@@ -52,22 +86,54 @@ describe('Sofa model contract', () => {
   });
 
   it('uses a simple interaction box for sofa picking and dragging', () => {
-    expect(SOFA_INTERACTION_BOUNDS).toEqual({
+    expect(sofaModule.SOFA_INTERACTION_BOUNDS).toEqual({
       size: [2.49, 1.21, 0.93],
       position: [0, 0.605, 0],
     });
   });
 
   it('rotates and scales the source model into the existing sofa footprint', () => {
-    expect(SOFA_MODEL_TRANSFORM.rotation).toEqual([0, Math.PI / 2, 0]);
-    expect(getScaledSofaModelSize()).toEqual({
+    expect(sofaModule.SOFA_MODEL_TRANSFORM.rotation).toEqual([0, Math.PI / 2, 0]);
+    expect(sofaModule.getScaledSofaModelSize()).toEqual({
       width: 2.49,
       height: 0.8,
       depth: 0.91,
     });
-    expect(SOFA_MODEL_TRANSFORM.position[1]).toBeCloseTo(0.4, 2);
+    expect(sofaModule.SOFA_MODEL_TRANSFORM.position[1]).toBeCloseTo(0.4, 2);
   });
 });
+
+function findModelArtifactChild(element: ReactElementLike | undefined): ReactElementLike | undefined {
+  const children = readElementChildren(element);
+
+  for (const child of children) {
+    if (!child || typeof child !== 'object') {
+      continue;
+    }
+
+    const childElement = child as ReactElementLike;
+    if (typeof childElement.type === 'function' && childElement.type.name === 'ModelArtifact') {
+      return childElement;
+    }
+
+    const nestedMatch = findModelArtifactChild(childElement);
+    if (nestedMatch) {
+      return nestedMatch;
+    }
+  }
+
+  return undefined;
+}
+
+function readElementChildren(element: ReactElementLike | undefined): ReactElementLike[] {
+  const children = element?.props?.children;
+
+  if (Array.isArray(children)) {
+    return children as ReactElementLike[];
+  }
+
+  return children ? [children as ReactElementLike] : [];
+}
 
 function readSofaGlbMetadata() {
   const data = readFileSync(SOFA_ASSET_URL) as Buffer;

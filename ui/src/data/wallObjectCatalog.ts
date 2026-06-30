@@ -37,7 +37,7 @@ function requireCatalogItem(id: WallObjectId): WallObjectDefinition {
 }
 
 function createLayoutItem(item: WallObjectDefinition): WallObjectLayoutItem {
-  return {
+  const layoutItem: WallObjectLayoutItem = {
     id: item.id,
     name: item.name,
     wallId: item.wallId,
@@ -46,6 +46,12 @@ function createLayoutItem(item: WallObjectDefinition): WallObjectLayoutItem {
     size: { ...item.size },
     normalOffset: item.normalOffset,
   };
+
+  if (item.artifactId) {
+    layoutItem.artifactId = item.artifactId;
+  }
+
+  return layoutItem;
 }
 
 export function createInitialWallObjectLayout(): WallObjectLayoutMap {
