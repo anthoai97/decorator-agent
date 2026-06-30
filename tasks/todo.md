@@ -71,5 +71,5 @@
   - Verify: `cd ui && npm run smoke`
   - Dependencies: Task 8
 
-- [ ] Checkpoint: Complete review
+- [x] Checkpoint: Complete review
   - Verify: all `SPEC.md` success criteria are met and any deviations are approved.
