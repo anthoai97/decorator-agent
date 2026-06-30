@@ -59,7 +59,7 @@
 
 ## Phase 4: Compatibility and Launch Readiness
 
-- [ ] Task 8: Migrate agent placeholder and remove HTTP server compatibility shell
+- [x] Task 8: Migrate agent placeholder and remove HTTP server compatibility shell
   - Acceptance: `/api/agent/runs` placeholder works, obsolete `http.server` production code is removed, tests use FastAPI-compatible helpers.
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Tasks 4 and 7

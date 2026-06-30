@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+from typing import Any
+from uuid import uuid4
+
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
+
+from server.api.routes.commands import read_json_body, validation_error_response
+
+JsonObject = dict[str, Any]
+
+router = APIRouter(prefix="/api", tags=["agent"])
+
+
+@router.post("/agent/runs")
+async def post_agent_run(request: Request) -> JSONResponse:
+    try:
+        body = await read_json_body(request)
+    except ValueError as error:
+        return validation_error_response(str(error))
+
+    return JSONResponse({"event": create_agent_placeholder_event(body)})
+
+
+def create_agent_placeholder_event(request: JsonObject) -> JsonObject:
+    return {
+        "id": str(uuid4()),
+        "type": "agent.placeholder.completed",
+        "source": "server",
+        "message": "Agent placeholder received the request. Real Agent SDK setup is not configured yet.",
+        "request": request,
+    }
