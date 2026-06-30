@@ -19,7 +19,7 @@
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 1
 
-- [ ] Task 3: Add shared HTTP contract helpers with state read path
+- [x] Task 3: Add shared HTTP contract helpers with state read path
   - Acceptance: CORS compatible, validation/not-found envelopes preserved, `/api/state` response unchanged, routes use FastAPI dependencies.
   - Verify: `cd server && uv run --python 3.13 pytest`
   - Dependencies: Task 2

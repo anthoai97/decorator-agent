@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from uuid import uuid4
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from server.artifacts import (
     ArtifactNotFoundError,
@@ -27,6 +28,8 @@ from server.artifact_store import ArtifactStore
 from server.commands import validate_command
 from server.events import EventBroker, format_sse_comment, format_sse_event
 from server.executor import CommandExecutor
+from server.api.errors import register_error_handlers
+from server.api.routes import state
 from server.store import SQLiteStore
 
 JsonObject = dict[str, Any]
@@ -94,10 +97,19 @@ def create_app(
             services.close()
 
     app = FastAPI(title="Decorator Agent API", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type"],
+    )
+    register_error_handlers(app)
 
     @app.get("/health")
     def health() -> JsonObject:
         return {"ok": True}
+
+    app.include_router(state.router)
 
     return app
 

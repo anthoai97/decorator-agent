@@ -7,8 +7,10 @@ import threading
 import unittest
 from http.client import HTTPConnection
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
+from fastapi import Query
 from starlette.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -154,6 +156,83 @@ def test_create_app_closes_store_on_shutdown(temp_database_path: Path) -> None:
             pass
 
         close_store.assert_called_once()
+
+
+def test_create_app_serves_state_snapshot(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/state")
+    body = response.json()
+
+    assert response.status_code == 200
+    assert body["revision"] == 0
+    assert body["lastEventId"] == 0
+    assert "sofa" in body["state"]["furniture"]
+    assert "window" in body["state"]["wallObjects"]
+
+
+def test_state_route_uses_services_dependency(temp_database_path: Path) -> None:
+    from server.api.dependencies import get_services
+
+    class FakeStore:
+        def load_state_snapshot(self) -> dict[str, object]:
+            return {
+                "state": {"revision": 7, "furniture": {}, "wallObjects": {}},
+                "revision": 7,
+                "lastEventId": 42,
+            }
+
+    app = create_app(
+        database_path=temp_database_path,
+        heartbeat_seconds=0.1,
+    )
+    app.dependency_overrides[get_services] = lambda: SimpleNamespace(store=FakeStore())
+
+    with TestClient(app) as client:
+        assert client.get("/api/state").json() == {
+            "state": {"revision": 7, "furniture": {}, "wallObjects": {}},
+            "revision": 7,
+            "lastEventId": 42,
+        }
+
+
+def test_create_app_normalizes_not_found_errors(fastapi_client: TestClient) -> None:
+    response = fastapi_client.get("/api/missing")
+
+    assert response.status_code == 404
+    assert response.json() == {"error": {"code": "NOT_FOUND", "message": "Route not found"}}
+
+
+def test_create_app_normalizes_validation_errors(temp_database_path: Path) -> None:
+    app = create_app(
+        database_path=temp_database_path,
+        heartbeat_seconds=0.1,
+    )
+
+    @app.get("/validation-probe")
+    def validation_probe(page: int = Query(ge=1)) -> dict[str, int]:
+        return {"page": page}
+
+    with TestClient(app) as client:
+        response = client.get("/validation-probe?page=0")
+        body = response.json()
+
+        assert response.status_code == 422
+        assert body["error"]["code"] == "VALIDATION_ERROR"
+        assert "page" in body["error"]["message"]
+
+
+def test_create_app_allows_local_cors_preflight(fastapi_client: TestClient) -> None:
+    response = fastapi_client.options(
+        "/api/state",
+        headers={
+            "Origin": "http://127.0.0.1:5173",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "Content-Type",
+        },
+    )
+
+    assert response.status_code in {200, 204}
+    assert response.headers["access-control-allow-origin"] == "*"
+    assert "GET" in response.headers["access-control-allow-methods"]
 
 
 class RequestHandlerTests(unittest.TestCase):
