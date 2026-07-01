@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from server.api.routes.commands import read_json_body, validation_error_response
-
-JsonObject = dict[str, Any]
+from server.api.errors import validation_error_response
+from server.api.request_body import JsonObject, read_json_body
 
 router = APIRouter(prefix="/api", tags=["agent"])
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
-from http import HTTPStatus
 from queue import Empty
 from typing import Any
 
@@ -10,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from server.api.dependencies import get_services
-from server.api.errors import error_payload
+from server.api.errors import validation_error_response
 from server.events import format_sse_comment, format_sse_event
 
 router = APIRouter(prefix="/api", tags=["events"])
@@ -93,10 +92,3 @@ def parse_event_id(value: str, label: str) -> int:
         raise ValueError(f"{label} must be a non-negative integer")
 
     return event_id
-
-
-def validation_error_response(message: str) -> JSONResponse:
-    return JSONResponse(
-        error_payload("VALIDATION_ERROR", message),
-        status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-    )

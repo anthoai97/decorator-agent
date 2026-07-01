@@ -12,6 +12,13 @@ def error_payload(code: str, message: str) -> dict[str, dict[str, str]]:
     return {"error": {"code": code, "message": message}}
 
 
+def validation_error_response(message: str) -> JSONResponse:
+    return JSONResponse(
+        error_payload("VALIDATION_ERROR", message),
+        status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+    )
+
+
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, error: RequestValidationError) -> JSONResponse:

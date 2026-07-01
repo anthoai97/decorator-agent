@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from server.artifacts import ArtifactNotFoundError, artifact_to_metadata, resolve_artifact_path
 from server.api.dependencies import get_services
-from server.api.errors import error_payload
+from server.api.errors import error_payload, validation_error_response
 
 MAX_ARTIFACT_IDS_PER_BATCH = 100
 DEFAULT_ARTIFACT_PAGE_SIZE = 24
@@ -246,13 +246,6 @@ def format_host(host: str, port: int, scheme: str) -> str:
 
 def default_port(scheme: str) -> int:
     return 443 if scheme == "https" else 80
-
-
-def validation_error_response(message: str) -> JSONResponse:
-    return JSONResponse(
-        error_payload("VALIDATION_ERROR", message),
-        status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
-    )
 
 
 def artifact_not_found_response() -> JSONResponse:
